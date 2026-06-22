@@ -1,10 +1,13 @@
 from pymongo import MongoClient
-from config import MONGO_URI, DATABASE_NAME
 
-client = MongoClient(MONGO_URI)
+client = MongoClient(
+    "mongodb://localhost:27017"
+)
 
-db = client[DATABASE_NAME]
+db = client["MarketDB"]
 
-trades = db["trades"]
-performance = db["performance"]
+paper_trades = db["paper_trades"]
 strategies = db["strategies"]
+strategy_versions = db["strategy_versions"]
+learning_logs = db["learning_logs"]
+daily_stats = db["daily_stats"]

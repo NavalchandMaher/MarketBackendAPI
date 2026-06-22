@@ -1,25 +1,33 @@
 import ccxt
 import pandas as pd
 
-exchange = ccxt.binance()
+exchange = ccxt.binance({
+    "options": {
+        "defaultType": "future"
+    }
+})
 
-def get_candles(symbol, timeframe="15m", limit=200):
-    ohlcv = exchange.fetch_ohlcv(
-        symbol,
-        timeframe=timeframe,
-        limit=limit
-    )
+class MarketData:
 
-    df = pd.DataFrame(
-        ohlcv,
-        columns=[
-            "timestamp",
-            "open",
-            "high",
-            "low",
-            "close",
-            "volume"
-        ]
-    )
+    @staticmethod
+    def get_ohlcv(symbol, timeframe, limit=250):
 
-    return df
+        pair = symbol.replace("USDT", "/USDT")
+
+        bars = exchange.fetch_ohlcv(
+            pair,
+            timeframe=timeframe,
+            limit=limit
+        )
+
+        return pd.DataFrame(
+            bars,
+            columns=[
+                "time",
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume"
+            ]
+        )
