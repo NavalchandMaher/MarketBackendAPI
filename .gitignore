@@ -1,0 +1,5 @@
+.env
+*.env
+market.env
+__pycache__/
+venv/
