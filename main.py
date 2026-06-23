@@ -2,6 +2,9 @@ from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from services.signal_engine import analyze_market
+from bson import ObjectId
+from db.mongodb import paper_trades
+
 
 from db.mongodb import (
     paper_trades,
@@ -292,4 +295,125 @@ def performance():
         "net_profit":
             round(profit, 2)
     }
+
+@app.get("/paper-trades/history")
+def get_trade_history(limit: int = 100):
+
+    trades = list(
+        paper_trades
+        .find()
+        .sort("entry_time", -1)
+        .limit(limit)
+    )
+
+    response = []
+
+    for trade in trades:
+
+        response.append({
+
+            "id": str(
+                trade.get("_id")
+            ),
+
+            "symbol":
+                trade.get(
+                    "symbol"
+                ),
+
+            "timeframe":
+                trade.get(
+                    "timeframe"
+                ),
+
+            "strategy_name":
+                trade.get(
+                    "strategy_name"
+                ),
+
+            "strategy_version":
+                trade.get(
+                    "strategy_version"
+                ),
+
+            "signal":
+                trade.get(
+                    "signal"
+                ),
+
+            "entry":
+                trade.get(
+                    "entry_price",
+                    0
+                ),
+
+            "exit":
+                trade.get(
+                    "exit_price",
+                    0
+                ),
+
+            "stop_loss":
+                trade.get(
+                    "stop_loss",
+                    0
+                ),
+
+            "target_price":
+                trade.get(
+                    "target_price",
+                    0
+                ),
+
+            "confidence":
+                trade.get(
+                    "confidence",
+                    0
+                ),
+
+            "status":
+                trade.get(
+                    "status",
+                    "OPEN"
+                ),
+
+            "pnl":
+                trade.get(
+                    "profit_loss",
+                    0
+                ),
+
+            "profit_percent":
+                trade.get(
+                    "profit_percent",
+                    0
+                ),
+
+            "result":
+                trade.get(
+                    "win_loss",
+                    ""
+                ),
+
+            "entry_time":
+                str(
+                    trade.get(
+                        "entry_time"
+                    )
+                ),
+
+            "exit_time":
+                str(
+                    trade.get(
+                        "exit_time"
+                    )
+                ),
+
+            "market_regime":
+                trade.get(
+                    "market_regime"
+                )
+        })
+
+    return response
 

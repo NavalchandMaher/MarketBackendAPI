@@ -347,16 +347,29 @@ def analyze_market(symbol="BTCUSDT", timeframe="5m"):
     "status": "OPEN"
     })
     if not existing_trade:
-        PaperTrading.open_trade(
-            {
-                "symbol": symbol,
-                "signal": signal,
-                "strategy": strategy["strategy_name"],
-                "price": price,
-                "confidence": confidence,
-                "indicators": snapshot
+        PaperTrading.open_trade({
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "strategy_name":
+                strategy["strategy_name"],
+            "strategy_version":
+                strategy["version"],
+            "signal": signal,
+            "price": price,
+            "confidence": confidence,
+            "market_regime": regime,
+
+            "indicators": {
+                "ema20": ema20,
+                "ema50": ema50,
+                "rsi": rsi,
+                "macd": macd_val,
+                "adx": adx,
+                "pcr": pcr,
+                "volume_ratio": volume_ratio,
+                "oi_change_pct": oi_change
             }
-        )
+        })
     # CHART
 
     chart = (
