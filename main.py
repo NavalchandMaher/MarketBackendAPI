@@ -4,6 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from services.signal_engine import analyze_market
 from bson import ObjectId
 from db.mongodb import paper_trades
+from services.backtester import run_backtest
+from db.mongodb import backtest_results
 
 
 from db.mongodb import (
@@ -417,3 +419,20 @@ def get_trade_history(limit: int = 100):
 
     return response
 
+@app.get("/backtest")
+def backtest(
+    symbol: str = Query("BTCUSDT")
+):
+    return run_backtest(symbol)
+
+@app.get("/backtest/history")
+def backtest_history():
+
+    data = list(
+        backtest_results.find(
+            {},
+            {"_id": 0}
+        )
+    )
+
+    return data
