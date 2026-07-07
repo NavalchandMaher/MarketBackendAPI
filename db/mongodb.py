@@ -20,19 +20,23 @@ DATABASE_NAME = "MarketAI_V2"
 
 try:
 
-    client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+    client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=2000)
 
     client.admin.command("ping")
 
+    connected = True
+
     print("MongoDB Connected Successfully")
 
-except ConnectionFailure as e:
+except Exception as e:
+
+    connected = False
 
     print("MongoDB Connection Failed")
 
     print(e)
 
-    raise e
+    client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=2000)
 
 # ==========================================================
 # DATABASE
@@ -74,29 +78,31 @@ scheduler_logs = db["scheduler_logs"]
 # INDEXES
 # ==========================================================
 
-paper_trades.create_index([("symbol", ASCENDING), ("status", ASCENDING)])
+if connected:
 
-paper_trades.create_index([("created_at", ASCENDING)])
+    paper_trades.create_index([("symbol", ASCENDING), ("status", ASCENDING)])
 
-closed_trades.create_index([("symbol", ASCENDING)])
+    paper_trades.create_index([("created_at", ASCENDING)])
 
-closed_trades.create_index([("closed_at", ASCENDING)])
+    closed_trades.create_index([("symbol", ASCENDING)])
 
-strategies.create_index([("strategy_name", ASCENDING)], unique=True)
+    closed_trades.create_index([("closed_at", ASCENDING)])
 
-strategies.create_index([("enabled", ASCENDING)])
+    strategies.create_index([("strategy_name", ASCENDING)], unique=True)
 
-performance.create_index([("date", ASCENDING)], unique=True)
+    strategies.create_index([("enabled", ASCENDING)])
 
-learning_logs.create_index([("created_at", ASCENDING)])
+    performance.create_index([("date", ASCENDING)], unique=True)
 
-backtest_results.create_index([("strategy_name", ASCENDING), ("symbol", ASCENDING)])
+    learning_logs.create_index([("created_at", ASCENDING)])
 
-market_snapshots.create_index([("symbol", ASCENDING), ("created_at", ASCENDING)])
+    backtest_results.create_index([("strategy_name", ASCENDING), ("symbol", ASCENDING)])
 
-strategy_history.create_index([("strategy_name", ASCENDING), ("version", ASCENDING)])
+    market_snapshots.create_index([("symbol", ASCENDING), ("created_at", ASCENDING)])
 
-scheduler_logs.create_index([("job_name", ASCENDING), ("run_time", ASCENDING)])
+    strategy_history.create_index([("strategy_name", ASCENDING), ("version", ASCENDING)])
+
+    scheduler_logs.create_index([("job_name", ASCENDING), ("run_time", ASCENDING)])
 
 # ==========================================================
 # DEFAULT STRATEGY
@@ -122,7 +128,7 @@ default_strategy = {
     "created_by": "SYSTEM",
 }
 
-if strategies.count_documents({"enabled": True}) == 0:
+if connected and strategies.count_documents({"enabled": True}) == 0:
 
     strategies.insert_one(default_strategy)
 
@@ -132,7 +138,7 @@ if strategies.count_documents({"enabled": True}) == 0:
 # DEFAULT SETTINGS
 # ==========================================================
 
-if settings.count_documents({}) == 0:
+if connected and settings.count_documents({}) == 0:
 
     settings.insert_one(
         {

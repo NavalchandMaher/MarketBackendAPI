@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from db.mongodb import learning_logs
 from services.signal_engine import analyze_market
+from routes.v3_routes import router as v3_router
 
 from services.backtester import BackTester
 from db.mongodb import backtest_results
@@ -27,7 +28,7 @@ async def lifespan(app: FastAPI):
     SchedulerService.shutdown()
 
 
-app = FastAPI(title="Market AI V2", version="2.0", lifespan=lifespan)
+app = FastAPI(title="Market AI V2", version="3.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -36,6 +37,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(v3_router)
 
 
 @app.get("/analysis")
