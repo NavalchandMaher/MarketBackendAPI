@@ -15,51 +15,59 @@ class PerformanceService:
     # ==========================================
 
     @staticmethod
-    def trades():
-
-        return list(closed_trades.find())
+    def trades(user_id=None):
+        query = {}
+        if user_id:
+            query["user_id"] = user_id
+        return list(closed_trades.find(query))
 
     # ==========================================
     # TOTAL TRADES
     # ==========================================
 
     @staticmethod
-    def total_trades():
-
-        return closed_trades.count_documents({})
+    def total_trades(user_id=None):
+        query = {}
+        if user_id:
+            query["user_id"] = user_id
+        return closed_trades.count_documents(query)
 
     # ==========================================
     # WIN COUNT
     # ==========================================
 
     @staticmethod
-    def wins():
-
-        return closed_trades.count_documents({"result": "WIN"})
+    def wins(user_id=None):
+        query = {"result": "WIN"}
+        if user_id:
+            query["user_id"] = user_id
+        return closed_trades.count_documents(query)
 
     # ==========================================
     # LOSS COUNT
     # ==========================================
 
     @staticmethod
-    def losses():
-
-        return closed_trades.count_documents({"result": "LOSS"})
+    def losses(user_id=None):
+        query = {"result": "LOSS"}
+        if user_id:
+            query["user_id"] = user_id
+        return closed_trades.count_documents(query)
 
     # ==========================================
     # WIN RATE
     # ==========================================
 
     @staticmethod
-    def win_rate():
+    def win_rate(user_id=None):
 
-        total = PerformanceService.total_trades()
+        total = PerformanceService.total_trades(user_id=user_id)
 
         if total == 0:
 
             return 0
 
-        wins = PerformanceService.wins()
+        wins = PerformanceService.wins(user_id=user_id)
 
         return round((wins / total) * 100, 2)
 
@@ -68,11 +76,11 @@ class PerformanceService:
     # ==========================================
 
     @staticmethod
-    def total_profit():
+    def total_profit(user_id=None):
 
         profit = 0
 
-        for trade in PerformanceService.trades():
+        for trade in PerformanceService.trades(user_id=user_id):
 
             pnl = trade.get("pnl", 0)
 
@@ -87,11 +95,11 @@ class PerformanceService:
     # ==========================================
 
     @staticmethod
-    def total_loss():
+    def total_loss(user_id=None):
 
         loss = 0
 
-        for trade in PerformanceService.trades():
+        for trade in PerformanceService.trades(user_id=user_id):
 
             pnl = trade.get("pnl", 0)
 
@@ -106,10 +114,10 @@ class PerformanceService:
     # ==========================================
 
     @staticmethod
-    def net_profit():
+    def net_profit(user_id=None):
 
         return round(
-            PerformanceService.total_profit() - PerformanceService.total_loss(), 2
+            PerformanceService.total_profit(user_id=user_id) - PerformanceService.total_loss(user_id=user_id), 2
         )
 
     # ==========================================
@@ -117,9 +125,9 @@ class PerformanceService:
     # ==========================================
 
     @staticmethod
-    def current_balance():
+    def current_balance(user_id=None):
 
-        return round(INITIAL_BALANCE + PerformanceService.net_profit(), 2)
+        return round(INITIAL_BALANCE + PerformanceService.net_profit(user_id=user_id), 2)
 
         # ==========================================
 
@@ -127,11 +135,11 @@ class PerformanceService:
     # ==========================================
 
     @staticmethod
-    def profit_factor():
+    def profit_factor(user_id=None):
 
-        profit = PerformanceService.total_profit()
+        profit = PerformanceService.total_profit(user_id=user_id)
 
-        loss = PerformanceService.total_loss()
+        loss = PerformanceService.total_loss(user_id=user_id)
 
         if loss == 0:
 
@@ -144,11 +152,11 @@ class PerformanceService:
     # ==========================================
 
     @staticmethod
-    def average_win():
+    def average_win(user_id=None):
 
         wins = [
             trade["pnl"]
-            for trade in PerformanceService.trades()
+            for trade in PerformanceService.trades(user_id=user_id)
             if trade.get("pnl", 0) > 0
         ]
 
@@ -163,11 +171,11 @@ class PerformanceService:
     # ==========================================
 
     @staticmethod
-    def average_loss():
+    def average_loss(user_id=None):
 
         losses = [
             abs(trade["pnl"])
-            for trade in PerformanceService.trades()
+            for trade in PerformanceService.trades(user_id=user_id)
             if trade.get("pnl", 0) < 0
         ]
 
@@ -182,22 +190,22 @@ class PerformanceService:
     # ==========================================
 
     @staticmethod
-    def risk_reward_ratio():
+    def risk_reward_ratio(user_id=None):
 
-        avg_loss = PerformanceService.average_loss()
+        avg_loss = PerformanceService.average_loss(user_id=user_id)
 
         if avg_loss == 0:
 
             return 0
 
-        return round(PerformanceService.average_win() / avg_loss, 2)
+        return round(PerformanceService.average_win(user_id=user_id) / avg_loss, 2)
 
     # ==========================================
     # MAX DRAWDOWN
     # ==========================================
 
     @staticmethod
-    def max_drawdown():
+    def max_drawdown(user_id=None):
 
         balance = INITIAL_BALANCE
 
@@ -206,7 +214,7 @@ class PerformanceService:
         max_dd = 0
 
         trades = sorted(
-            PerformanceService.trades(), key=lambda x: x.get("closed_at", datetime.min)
+            PerformanceService.trades(user_id=user_id), key=lambda x: x.get("closed_at", datetime.min)
         )
 
         for trade in trades:
@@ -232,9 +240,9 @@ class PerformanceService:
     # ==========================================
 
     @staticmethod
-    def sharpe_ratio(risk_free_rate=0.0):
+    def sharpe_ratio(risk_free_rate=0.0, user_id=None):
 
-        pnls = [trade.get("pnl", 0) for trade in PerformanceService.trades()]
+        pnls = [trade.get("pnl", 0) for trade in PerformanceService.trades(user_id=user_id)]
 
         if len(pnls) < 2:
 
@@ -259,11 +267,11 @@ class PerformanceService:
     # ==========================================
 
     @staticmethod
-    def daily_statistics():
+    def daily_statistics(user_id=None):
 
         stats = {}
 
-        for trade in PerformanceService.trades():
+        for trade in PerformanceService.trades(user_id=user_id):
 
             closed_at = trade.get("closed_at")
 
@@ -304,11 +312,11 @@ class PerformanceService:
     # ==========================================
 
     @staticmethod
-    def weekly_statistics():
+    def weekly_statistics(user_id=None):
 
         stats = {}
 
-        for trade in PerformanceService.trades():
+        for trade in PerformanceService.trades(user_id=user_id):
 
             closed_at = trade.get("closed_at")
 
@@ -351,11 +359,11 @@ class PerformanceService:
     # ==========================================
 
     @staticmethod
-    def monthly_statistics():
+    def monthly_statistics(user_id=None):
 
         stats = {}
 
-        for trade in PerformanceService.trades():
+        for trade in PerformanceService.trades(user_id=user_id):
 
             closed_at = trade.get("closed_at")
 
@@ -396,11 +404,11 @@ class PerformanceService:
     # ==========================================
 
     @staticmethod
-    def symbol_performance():
+    def symbol_performance(user_id=None):
 
         performance = {}
 
-        for trade in PerformanceService.trades():
+        for trade in PerformanceService.trades(user_id=user_id):
 
             symbol = trade.get("symbol", "UNKNOWN")
 
@@ -435,11 +443,11 @@ class PerformanceService:
     # ==========================================
 
     @staticmethod
-    def strategy_performance():
+    def strategy_performance(user_id=None):
 
         performance = {}
 
-        for trade in PerformanceService.trades():
+        for trade in PerformanceService.trades(user_id=user_id):
 
             strategy = trade.get("strategy_name", "DEFAULT")
 
@@ -475,14 +483,14 @@ class PerformanceService:
     # ==========================================
 
     @staticmethod
-    def equity_curve():
+    def equity_curve(user_id=None):
 
         balance = INITIAL_BALANCE
 
         curve = []
 
         trades = sorted(
-            PerformanceService.trades(), key=lambda x: x.get("closed_at", datetime.min)
+            PerformanceService.trades(user_id=user_id), key=lambda x: x.get("closed_at", datetime.min)
         )
 
         for trade in trades:
@@ -504,16 +512,16 @@ class PerformanceService:
     # ==========================================
 
     @staticmethod
-    def account_summary():
+    def account_summary(user_id=None):
 
         return {
             "initial_balance": INITIAL_BALANCE,
-            "current_balance": PerformanceService.current_balance(),
-            "net_profit": PerformanceService.net_profit(),
-            "win_rate": PerformanceService.win_rate(),
-            "total_trades": PerformanceService.total_trades(),
-            "wins": PerformanceService.wins(),
-            "losses": PerformanceService.losses(),
+            "current_balance": PerformanceService.current_balance(user_id=user_id),
+            "net_profit": PerformanceService.net_profit(user_id=user_id),
+            "win_rate": PerformanceService.win_rate(user_id=user_id),
+            "total_trades": PerformanceService.total_trades(user_id=user_id),
+            "wins": PerformanceService.wins(user_id=user_id),
+            "losses": PerformanceService.losses(user_id=user_id),
         }
 
     # ==========================================
@@ -521,17 +529,17 @@ class PerformanceService:
     # ==========================================
 
     @staticmethod
-    def snapshot():
+    def snapshot(user_id=None):
 
         return {
-            "summary": PerformanceService.account_summary(),
+            "summary": PerformanceService.account_summary(user_id=user_id),
             "metrics": {
-                "profit_factor": PerformanceService.profit_factor(),
-                "max_drawdown": PerformanceService.max_drawdown(),
-                "sharpe_ratio": PerformanceService.sharpe_ratio(),
-                "average_win": PerformanceService.average_win(),
-                "average_loss": PerformanceService.average_loss(),
-                "risk_reward": PerformanceService.risk_reward_ratio(),
+                "profit_factor": PerformanceService.profit_factor(user_id=user_id),
+                "max_drawdown": PerformanceService.max_drawdown(user_id=user_id),
+                "sharpe_ratio": PerformanceService.sharpe_ratio(user_id=user_id),
+                "average_win": PerformanceService.average_win(user_id=user_id),
+                "average_loss": PerformanceService.average_loss(user_id=user_id),
+                "risk_reward": PerformanceService.risk_reward_ratio(user_id=user_id),
             },
         }
 
@@ -540,17 +548,17 @@ class PerformanceService:
     # ==========================================
 
     @staticmethod
-    def dashboard():
+    def dashboard(user_id=None):
 
         return {
-            "account": PerformanceService.account_summary(),
-            "snapshot": PerformanceService.snapshot(),
-            "daily": PerformanceService.daily_statistics(),
-            "weekly": PerformanceService.weekly_statistics(),
-            "monthly": PerformanceService.monthly_statistics(),
-            "symbols": PerformanceService.symbol_performance(),
-            "strategies": PerformanceService.strategy_performance(),
-            "equity_curve": PerformanceService.equity_curve(),
+            "account": PerformanceService.account_summary(user_id=user_id),
+            "snapshot": PerformanceService.snapshot(user_id=user_id),
+            "daily": PerformanceService.daily_statistics(user_id=user_id),
+            "weekly": PerformanceService.weekly_statistics(user_id=user_id),
+            "monthly": PerformanceService.monthly_statistics(user_id=user_id),
+            "symbols": PerformanceService.symbol_performance(user_id=user_id),
+            "strategies": PerformanceService.strategy_performance(user_id=user_id),
+            "equity_curve": PerformanceService.equity_curve(user_id=user_id),
         }
 
     # ==========================================
@@ -558,20 +566,20 @@ class PerformanceService:
     # ==========================================
 
     @staticmethod
-    def refresh():
+    def refresh(user_id=None):
 
-        return PerformanceService.dashboard()
+        return PerformanceService.dashboard(user_id=user_id)
 
     # ==========================================
     # HEALTH CHECK
     # ==========================================
 
     @staticmethod
-    def health():
+    def health(user_id=None):
 
         return {
             "service": "PerformanceService",
             "status": "UP",
             "timestamp": datetime.utcnow(),
-            "closed_trades": PerformanceService.total_trades(),
+            "closed_trades": PerformanceService.total_trades(user_id=user_id),
         }

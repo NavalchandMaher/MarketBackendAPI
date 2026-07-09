@@ -16,11 +16,16 @@ from db.mongodb import (
 from services.paper_trading import PaperTrading
 from services.backtester import BackTester
 from services.signal_engine import analyze_market
+from services.auth_service import AuthService
 
 logger = logging.getLogger(__name__)
 
 
 class V3Service:
+    @staticmethod
+    def _build_user_scope(user_id: Optional[str] = None) -> Dict[str, Any]:
+        return {"user_id": user_id} if user_id else {}
+
     @staticmethod
     def _jsonify_document(doc: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         if not doc:
@@ -31,11 +36,12 @@ class V3Service:
         return doc
 
     @staticmethod
-    def dashboard_summary() -> Dict[str, Any]:
-        open_trades = paper_trades.count_documents({"status": "OPEN"})
-        closed_trades_count = closed_trades.count_documents({})
-        last_trade = closed_trades.find_one({}, sort=[("closed_at", -1)]) or paper_trades.find_one({}, sort=[("created_at", -1)])
-        latest_strategy = strategies.find_one({}, sort=[("created_at", -1)])
+    def dashboard_summary(user_id: Optional[str] = None) -> Dict[str, Any]:
+        query = V3Service._build_user_scope(user_id)
+        open_trades = paper_trades.count_documents({"status": "OPEN", **query})
+        closed_trades_count = closed_trades.count_documents(query)
+        last_trade = closed_trades.find_one(query, sort=[("closed_at", -1)]) or paper_trades.find_one(query, sort=[("created_at", -1)])
+        latest_strategy = strategies.find_one(query, sort=[("created_at", -1)])
         latest_signal = {"signal": "WAIT", "confidence": 0, "price": 0}
         try:
             latest_signal = analyze_market(symbol="BTCUSDT", timeframe="5m")
@@ -55,22 +61,25 @@ class V3Service:
         }
 
     @staticmethod
-    def list_strategies() -> List[Dict[str, Any]]:
-        docs = list(strategies.find().sort("created_at", -1))
+    def list_strategies(user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        query = V3Service._build_user_scope(user_id)
+        docs = list(strategies.find(query).sort("created_at", -1))
         return [V3Service._jsonify_document(doc) for doc in docs]
 
     @staticmethod
-    def get_strategy(strategy_id: str) -> Optional[Dict[str, Any]]:
+    def get_strategy(strategy_id: str, user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         from bson.objectid import ObjectId
+        query = V3Service._build_user_scope(user_id)
         try:
-            doc = strategies.find_one({"_id": ObjectId(strategy_id)})
+            doc = strategies.find_one({"_id": ObjectId(strategy_id), **query})
         except Exception:
-            doc = strategies.find_one({"_id": strategy_id})
+            doc = strategies.find_one({"_id": strategy_id, **query})
         return V3Service._jsonify_document(doc)
 
     @staticmethod
     def create_strategy(payload: Dict[str, Any]) -> Dict[str, Any]:
         doc = {
+            "user_id": payload.get("user_id"),
             "strategy_name": payload.get("strategy_name", "NEW_STRATEGY"),
             "version": payload.get("version", 1),
             "enabled": payload.get("enabled", True),
@@ -91,7 +100,7 @@ class V3Service:
         return V3Service._jsonify_document(doc)
 
     @staticmethod
-    def update_strategy(strategy_id: str, payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update_strategy(strategy_id: str, payload: Dict[str, Any], user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         from bson.objectid import ObjectId
         try:
             object_id = ObjectId(strategy_id)
@@ -99,21 +108,22 @@ class V3Service:
             object_id = strategy_id
         update = dict(payload)
         update["updated_at"] = datetime.utcnow()
-        strategies.update_one({"_id": object_id}, {"$set": update})
-        return V3Service.get_strategy(strategy_id)
+        query = {"_id": object_id, **V3Service._build_user_scope(user_id)}
+        strategies.update_one(query, {"$set": update})
+        return V3Service.get_strategy(strategy_id, user_id)
 
     @staticmethod
-    def delete_strategy(strategy_id: str) -> Dict[str, Any]:
+    def delete_strategy(strategy_id: str, user_id: Optional[str] = None) -> Dict[str, Any]:
         from bson.objectid import ObjectId
         try:
             object_id = ObjectId(strategy_id)
         except Exception:
             object_id = strategy_id
-        result = strategies.delete_one({"_id": object_id})
+        result = strategies.delete_one({"_id": object_id, **V3Service._build_user_scope(user_id)})
         return {"success": result.deleted_count > 0, "deleted": result.deleted_count > 0}
 
     @staticmethod
-    def run_backtest(payload: Dict[str, Any]) -> Dict[str, Any]:
+    def run_backtest(payload: Dict[str, Any], user_id: Optional[str] = None) -> Dict[str, Any]:
         report = BackTester.run(
             symbol=payload.get("symbol", "BTCUSDT"),
             timeframe=payload.get("timeframe", "5m"),
@@ -121,6 +131,7 @@ class V3Service:
         )
         backtest_id = str(uuid.uuid4())
         payload_doc = {
+            "user_id": user_id or payload.get("user_id"),
             "backtest_id": backtest_id,
             "symbol": payload.get("symbol", "BTCUSDT"),
             "timeframe": payload.get("timeframe", "5m"),
@@ -132,26 +143,27 @@ class V3Service:
         return {"success": True, "backtest_id": backtest_id, "result": report}
 
     @staticmethod
-    def get_backtest(backtest_id: str) -> Optional[Dict[str, Any]]:
-        doc = backtest_results.find_one({"backtest_id": backtest_id})
+    def get_backtest(backtest_id: str, user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        doc = backtest_results.find_one({"backtest_id": backtest_id, **V3Service._build_user_scope(user_id)})
         if doc:
             doc = dict(doc)
             doc["id"] = str(doc.pop("_id"))
         return doc
 
     @staticmethod
-    def list_backtests() -> List[Dict[str, Any]]:
-        docs = list(backtest_results.find().sort("created_at", -1))
+    def list_backtests(user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        docs = list(backtest_results.find(V3Service._build_user_scope(user_id)).sort("created_at", -1))
         return [V3Service._jsonify_document(doc) for doc in docs]
 
     @staticmethod
-    def delete_backtest(backtest_id: str) -> Dict[str, Any]:
-        result = backtest_results.delete_one({"backtest_id": backtest_id})
+    def delete_backtest(backtest_id: str, user_id: Optional[str] = None) -> Dict[str, Any]:
+        result = backtest_results.delete_one({"backtest_id": backtest_id, **V3Service._build_user_scope(user_id)})
         return {"success": result.deleted_count > 0, "deleted": result.deleted_count > 0}
 
     @staticmethod
-    def paper_start() -> Dict[str, Any]:
+    def paper_start(user_id: Optional[str] = None) -> Dict[str, Any]:
         return PaperTrading.open_trade({
+            "user_id": user_id,
             "signal": "BUY",
             "symbol": "BTCUSDT",
             "timeframe": "5m",
@@ -174,19 +186,20 @@ class V3Service:
         return {"running": True, "message": "Paper trading engine is active."}
 
     @staticmethod
-    def paper_open() -> List[Dict[str, Any]]:
-        return PaperTrading.get_open_trades()
+    def paper_open(user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        return PaperTrading.get_open_trades(user_id=user_id)
 
     @staticmethod
-    def paper_history() -> List[Dict[str, Any]]:
-        return PaperTrading.get_closed_trades(limit=100)
+    def paper_history(user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        return PaperTrading.get_closed_trades(limit=100, user_id=user_id)
 
     @staticmethod
-    def paper_statistics() -> Dict[str, Any]:
+    def paper_statistics(user_id: Optional[str] = None) -> Dict[str, Any]:
+        query = V3Service._build_user_scope(user_id)
         return {
-            "total_trades": closed_trades.count_documents({}),
-            "wins": closed_trades.count_documents({"result": "WIN"}),
-            "losses": closed_trades.count_documents({"result": "LOSS"}),
+            "total_trades": closed_trades.count_documents(query),
+            "wins": closed_trades.count_documents({"result": "WIN", **query}),
+            "losses": closed_trades.count_documents({"result": "LOSS", **query}),
             "win_rate": 0,
         }
 
@@ -226,13 +239,13 @@ class V3Service:
         }
 
     @staticmethod
-    def learning_history() -> List[Dict[str, Any]]:
-        docs = list(learning_logs.find().sort("created_at", -1).limit(50))
+    def learning_history(user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        docs = list(learning_logs.find(V3Service._build_user_scope(user_id)).sort("created_at", -1).limit(50))
         return [V3Service._jsonify_document(doc) for doc in docs]
 
     @staticmethod
-    def learning_latest() -> Optional[Dict[str, Any]]:
-        doc = learning_logs.find_one({}, sort=[("created_at", -1)])
+    def learning_latest(user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        doc = learning_logs.find_one(V3Service._build_user_scope(user_id), sort=[("created_at", -1)])
         return V3Service._jsonify_document(doc)
 
     @staticmethod
@@ -240,22 +253,30 @@ class V3Service:
         return {"jobs": ["market_scanner", "paper_trading", "learning", "nightly_optimization", "report_generator"]}
 
     @staticmethod
-    def settings_get() -> Dict[str, Any]:
-        doc = settings.find_one({}) or {}
+    def settings_get(user_id: Optional[str] = None) -> Dict[str, Any]:
+        query = {"user_id": user_id} if user_id else {}
+        doc = settings.find_one(query) or {}
         return {"theme": doc.get("theme", "dark"), "refresh_interval": doc.get("refresh_interval", 30), "notifications": doc.get("notifications", True), "risk": doc.get("risk", 1.0), "default_symbol": doc.get("default_symbol", "BTCUSDT"), "default_timeframe": doc.get("default_timeframe", "5m")}
 
     @staticmethod
-    def settings_put(payload: Dict[str, Any]) -> Dict[str, Any]:
-        update = {"$set": payload}
-        settings.update_one({}, update, upsert=True)
-        return V3Service.settings_get()
+    def settings_put(payload: Dict[str, Any], user_id: Optional[str] = None) -> Dict[str, Any]:
+        update = {"$set": {**payload, "user_id": user_id}}
+        settings.update_one({"user_id": user_id} if user_id else {}, update, upsert=True)
+        return V3Service.settings_get(user_id)
 
     @staticmethod
-    def account_get() -> Dict[str, Any]:
+    def account_get(user_id: Optional[str] = None) -> Dict[str, Any]:
+        from db.mongodb import user_account
+        doc = user_account.find_one({"user_id": user_id}) if user_id else None
+        if doc:
+            return {"balance": doc.get("balance", 100000), "leverage": doc.get("leverage", 10), "broker": doc.get("broker", "Binance"), "risk_percent": doc.get("risk_percent", 1.0), "max_open_trades": doc.get("max_open_trades", 3)}
         return {"balance": 100000, "leverage": 10, "broker": "Binance", "risk_percent": 1.0, "max_open_trades": 3}
 
     @staticmethod
-    def account_put(payload: Dict[str, Any]) -> Dict[str, Any]:
+    def account_put(payload: Dict[str, Any], user_id: Optional[str] = None) -> Dict[str, Any]:
+        from db.mongodb import user_account
+        if user_id:
+            user_account.update_one({"user_id": user_id}, {"$set": {**payload, "user_id": user_id}}, upsert=True)
         return {"success": True, "account": payload}
 
     @staticmethod

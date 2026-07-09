@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from typing import Any, Dict, Optional
 
 from services.v3_service import V3Service
+from services.auth_service import AuthService
 
 router = APIRouter(prefix="/v3", tags=["v3"])
 
@@ -52,67 +53,71 @@ class AccountPayload(BaseModel):
 
 
 @router.get("/dashboard")
-def dashboard():
-    return V3Service.dashboard_summary()
+def dashboard(user=Depends(AuthService.get_current_user)):
+    return V3Service.dashboard_summary(user_id=str(user["_id"]))
 
 
 @router.get("/strategies")
-def strategies_list():
-    return V3Service.list_strategies()
+def strategies_list(user=Depends(AuthService.get_current_user)):
+    return V3Service.list_strategies(user_id=str(user["_id"]))
 
 
 @router.get("/strategies/{strategy_id}")
-def strategy_detail(strategy_id: str):
-    strategy = V3Service.get_strategy(strategy_id)
+def strategy_detail(strategy_id: str, user=Depends(AuthService.get_current_user)):
+    strategy = V3Service.get_strategy(strategy_id, user_id=str(user["_id"]))
     if not strategy:
         raise HTTPException(status_code=404, detail="Strategy not found")
     return strategy
 
 
 @router.post("/strategies", status_code=201)
-def create_strategy(payload: StrategyPayload):
-    return V3Service.create_strategy(payload.model_dump(exclude_none=True))
+def create_strategy(payload: StrategyPayload, user=Depends(AuthService.get_current_user)):
+    data = payload.model_dump(exclude_none=True)
+    data["user_id"] = str(user["_id"])
+    return V3Service.create_strategy(data)
 
 
 @router.put("/strategies/{strategy_id}")
-def update_strategy(strategy_id: str, payload: StrategyPayload):
-    updated = V3Service.update_strategy(strategy_id, payload.model_dump(exclude_none=True))
+def update_strategy(strategy_id: str, payload: StrategyPayload, user=Depends(AuthService.get_current_user)):
+    updated = V3Service.update_strategy(strategy_id, payload.model_dump(exclude_none=True), user_id=str(user["_id"]))
     if not updated:
         raise HTTPException(status_code=404, detail="Strategy not found")
     return updated
 
 
 @router.delete("/strategies/{strategy_id}")
-def delete_strategy(strategy_id: str):
-    return V3Service.delete_strategy(strategy_id)
+def delete_strategy(strategy_id: str, user=Depends(AuthService.get_current_user)):
+    return V3Service.delete_strategy(strategy_id, user_id=str(user["_id"]))
 
 
 @router.post("/backtest/run")
-def run_backtest(payload: BacktestPayload):
-    return V3Service.run_backtest(payload.model_dump(exclude_none=True))
+def run_backtest(payload: BacktestPayload, user=Depends(AuthService.get_current_user)):
+    data = payload.model_dump(exclude_none=True)
+    data["user_id"] = str(user["_id"])
+    return V3Service.run_backtest(data)
 
 
 @router.get("/backtest/{backtest_id}")
-def get_backtest(backtest_id: str):
-    backtest = V3Service.get_backtest(backtest_id)
+def get_backtest(backtest_id: str, user=Depends(AuthService.get_current_user)):
+    backtest = V3Service.get_backtest(backtest_id, user_id=str(user["_id"]))
     if not backtest:
         raise HTTPException(status_code=404, detail="Backtest not found")
     return backtest
 
 
 @router.get("/backtest/history")
-def list_backtests():
-    return V3Service.list_backtests()
+def list_backtests(user=Depends(AuthService.get_current_user)):
+    return V3Service.list_backtests(user_id=str(user["_id"]))
 
 
 @router.delete("/backtest/{backtest_id}")
-def delete_backtest(backtest_id: str):
-    return V3Service.delete_backtest(backtest_id)
+def delete_backtest(backtest_id: str, user=Depends(AuthService.get_current_user)):
+    return V3Service.delete_backtest(backtest_id, user_id=str(user["_id"]))
 
 
 @router.post("/paper/start")
-def paper_start():
-    return V3Service.paper_start()
+def paper_start(user=Depends(AuthService.get_current_user)):
+    return V3Service.paper_start(user_id=str(user["_id"]))
 
 
 @router.post("/paper/stop")
@@ -121,23 +126,23 @@ def paper_stop():
 
 
 @router.get("/paper/status")
-def paper_status():
+def paper_status(user=Depends(AuthService.get_current_user)):
     return V3Service.paper_status()
 
 
 @router.get("/paper/open")
-def paper_open():
-    return V3Service.paper_open()
+def paper_open(user=Depends(AuthService.get_current_user)):
+    return V3Service.paper_open(user_id=str(user["_id"]))
 
 
 @router.get("/paper/history")
-def paper_history():
-    return V3Service.paper_history()
+def paper_history(user=Depends(AuthService.get_current_user)):
+    return V3Service.paper_history(user_id=str(user["_id"]))
 
 
 @router.get("/paper/statistics")
-def paper_statistics():
-    return V3Service.paper_statistics()
+def paper_statistics(user=Depends(AuthService.get_current_user)):
+    return V3Service.paper_statistics(user_id=str(user["_id"]))
 
 
 @router.get("/brokers")
@@ -191,13 +196,13 @@ def reports_performance():
 
 
 @router.get("/learning")
-def learning_history():
-    return V3Service.learning_history()
+def learning_history(user=Depends(AuthService.get_current_user)):
+    return V3Service.learning_history(user_id=str(user["_id"]))
 
 
 @router.get("/learning/latest")
-def learning_latest():
-    return V3Service.learning_latest()
+def learning_latest(user=Depends(AuthService.get_current_user)):
+    return V3Service.learning_latest(user_id=str(user["_id"]))
 
 
 @router.get("/scheduler/jobs")
@@ -216,23 +221,23 @@ def scheduler_stop():
 
 
 @router.get("/settings")
-def settings_get():
-    return V3Service.settings_get()
+def settings_get(user=Depends(AuthService.get_current_user)):
+    return V3Service.settings_get(user_id=str(user["_id"]))
 
 
 @router.put("/settings")
-def settings_put(payload: SettingsPayload):
-    return V3Service.settings_put(payload.model_dump(exclude_none=True))
+def settings_put(payload: SettingsPayload, user=Depends(AuthService.get_current_user)):
+    return V3Service.settings_put(payload.model_dump(exclude_none=True), user_id=str(user["_id"]))
 
 
 @router.get("/account")
-def account_get():
-    return V3Service.account_get()
+def account_get(user=Depends(AuthService.get_current_user)):
+    return V3Service.account_get(user_id=str(user["_id"]))
 
 
 @router.put("/account")
-def account_put(payload: AccountPayload):
-    return V3Service.account_put(payload.model_dump(exclude_none=True))
+def account_put(payload: AccountPayload, user=Depends(AuthService.get_current_user)):
+    return V3Service.account_put(payload.model_dump(exclude_none=True), user_id=str(user["_id"]))
 
 
 @router.get("/symbols")

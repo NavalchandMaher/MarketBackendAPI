@@ -1,0 +1,788 @@
+{
+  "info": {
+    "_postman_id": "market-ai-v3-api",
+    "name": "Market AI V3 API Collection",
+    "description": "Complete Postman collection for Market AI V3 Backend API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "3.0.0"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"password\": \"SecurePassword123!\",\n  \"mobile_number\": \"+1234567890\",\n  \"role\": \"Trader\",\n  \"default_symbol\": \"BTCUSDT\",\n  \"default_timeframe\": \"5m\",\n  \"theme\": \"dark\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Login User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\",\n  \"password\": \"SecurePassword123!\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/refresh",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "refresh"]
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "logout"]
+            }
+          }
+        },
+        {
+          "name": "Forgot Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/forgot-password",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "forgot-password"]
+            }
+          }
+        },
+        {
+          "name": "Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"reset_token_from_email\",\n  \"new_password\": \"NewPassword123!\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/reset-password",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "reset-password"]
+            }
+          }
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"current_password\": \"SecurePassword123!\",\n  \"new_password\": \"NewPassword123!\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/change-password",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "change-password"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/me",
+              "host": ["{{base_url}}"],
+              "path": ["users", "me"]
+            }
+          }
+        },
+        {
+          "name": "Update User Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"Jane Doe\",\n  \"mobile_number\": \"+9876543210\",\n  \"default_symbol\": \"ETHUSDT\",\n  \"theme\": \"light\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/users/me",
+              "host": ["{{base_url}}"],
+              "path": ["users", "me"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "V3 - Dashboard & Account",
+      "item": [
+        {
+          "name": "Get Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v3/dashboard",
+              "host": ["{{base_url}}"],
+              "path": ["v3", "dashboard"]
+            }
+          }
+        },
+        {
+          "name": "Get Account",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v3/account",
+              "host": ["{{base_url}}"],
+              "path": ["v3", "account"]
+            }
+          }
+        },
+        {
+          "name": "Update Account",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"balance\": 200000.00,\n  \"risk_percent\": 1.5,\n  \"max_open_trades\": 10\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v3/account",
+              "host": ["{{base_url}}"],
+              "path": ["v3", "account"]
+            }
+          }
+        },
+        {
+          "name": "Get Settings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v3/settings",
+              "host": ["{{base_url}}"],
+              "path": ["v3", "settings"]
+            }
+          }
+        },
+        {
+          "name": "Update Settings",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"theme\": \"light\",\n  \"refresh_interval\": 60,\n  \"notifications\": true,\n  \"risk\": 1.5\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v3/settings",
+              "host": ["{{base_url}}"],
+              "path": ["v3", "settings"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "V3 - Strategies",
+      "item": [
+        {
+          "name": "List Strategies",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v3/strategies",
+              "host": ["{{base_url}}"],
+              "path": ["v3", "strategies"]
+            }
+          }
+        },
+        {
+          "name": "Get Strategy",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v3/strategies/507f1f77bcf86cd799439011",
+              "host": ["{{base_url}}"],
+              "path": ["v3", "strategies", "507f1f77bcf86cd799439011"]
+            }
+          }
+        },
+        {
+          "name": "Create Strategy",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"strategy_name\": \"Multi-EMA\",\n  \"version\": 1,\n  \"enabled\": true,\n  \"symbol\": \"BTCUSDT\",\n  \"timeframe\": \"5m\",\n  \"risk_percent\": 1.0,\n  \"tp\": 2.0,\n  \"sl\": 1.0,\n  \"indicator_parameters\": {\n    \"ema_fast\": 12,\n    \"ema_slow\": 26,\n    \"rsi_period\": 14\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v3/strategies",
+              "host": ["{{base_url}}"],
+              "path": ["v3", "strategies"]
+            }
+          }
+        },
+        {
+          "name": "Update Strategy",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"enabled\": false,\n  \"risk_percent\": 1.5\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v3/strategies/507f1f77bcf86cd799439011",
+              "host": ["{{base_url}}"],
+              "path": ["v3", "strategies", "507f1f77bcf86cd799439011"]
+            }
+          }
+        },
+        {
+          "name": "Delete Strategy",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v3/strategies/507f1f77bcf86cd799439011",
+              "host": ["{{base_url}}"],
+              "path": ["v3", "strategies", "507f1f77bcf86cd799439011"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "V3 - Paper Trading",
+      "item": [
+        {
+          "name": "Start Paper Trading",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v3/paper/start",
+              "host": ["{{base_url}}"],
+              "path": ["v3", "paper", "start"]
+            }
+          }
+        },
+        {
+          "name": "Stop Paper Trading",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v3/paper/stop",
+              "host": ["{{base_url}}"],
+              "path": ["v3", "paper", "stop"]
+            }
+          }
+        },
+        {
+          "name": "Get Paper Trading Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v3/paper/status",
+              "host": ["{{base_url}}"],
+              "path": ["v3", "paper", "status"]
+            }
+          }
+        },
+        {
+          "name": "Get Open Trades",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v3/paper/open",
+              "host": ["{{base_url}}"],
+              "path": ["v3", "paper", "open"]
+            }
+          }
+        },
+        {
+          "name": "Get Trade History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v3/paper/history",
+              "host": ["{{base_url}}"],
+              "path": ["v3", "paper", "history"]
+            }
+          }
+        },
+        {
+          "name": "Get Paper Trading Statistics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v3/paper/statistics",
+              "host": ["{{base_url}}"],
+              "path": ["v3", "paper", "statistics"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "V3 - Backtesting",
+      "item": [
+        {
+          "name": "Run Backtest",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"symbol\": \"BTCUSDT\",\n  \"timeframe\": \"5m\",\n  \"days\": 365\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v3/backtest/run",
+              "host": ["{{base_url}}"],
+              "path": ["v3", "backtest", "run"]
+            }
+          }
+        },
+        {
+          "name": "Get Backtest",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v3/backtest/507f1f77bcf86cd799439014",
+              "host": ["{{base_url}}"],
+              "path": ["v3", "backtest", "507f1f77bcf86cd799439014"]
+            }
+          }
+        },
+        {
+          "name": "List Backtests",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v3/backtest/history",
+              "host": ["{{base_url}}"],
+              "path": ["v3", "backtest", "history"]
+            }
+          }
+        },
+        {
+          "name": "Delete Backtest",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v3/backtest/507f1f77bcf86cd799439014",
+              "host": ["{{base_url}}"],
+              "path": ["v3", "backtest", "507f1f77bcf86cd799439014"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "V3 - Reports",
+      "item": [
+        {
+          "name": "Get Dashboard Report",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v3/reports/dashboard",
+              "host": ["{{base_url}}"],
+              "path": ["v3", "reports", "dashboard"]
+            }
+          }
+        },
+        {
+          "name": "Get Daily Report",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v3/reports/daily",
+              "host": ["{{base_url}}"],
+              "path": ["v3", "reports", "daily"]
+            }
+          }
+        },
+        {
+          "name": "Get Monthly Report",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v3/reports/monthly",
+              "host": ["{{base_url}}"],
+              "path": ["v3", "reports", "monthly"]
+            }
+          }
+        },
+        {
+          "name": "Get Performance Report",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v3/reports/performance",
+              "host": ["{{base_url}}"],
+              "path": ["v3", "reports", "performance"]
+            }
+          }
+        },
+        {
+          "name": "Get Equity Curve",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v3/reports/equity",
+              "host": ["{{base_url}}"],
+              "path": ["v3", "reports", "equity"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "V3 - Public Endpoints",
+      "item": [
+        {
+          "name": "Get Symbols",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/v3/symbols",
+              "host": ["{{base_url}}"],
+              "path": ["v3", "symbols"]
+            }
+          }
+        },
+        {
+          "name": "Get Timeframes",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/v3/timeframes",
+              "host": ["{{base_url}}"],
+              "path": ["v3", "timeframes"]
+            }
+          }
+        },
+        {
+          "name": "Get Market Analysis",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/analysis?symbol=BTCUSDT&timeframe=5m",
+              "host": ["{{base_url}}"],
+              "path": ["analysis"],
+              "query": [
+                {
+                  "key": "symbol",
+                  "value": "BTCUSDT"
+                },
+                {
+                  "key": "timeframe",
+                  "value": "5m"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Brokers",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/v3/brokers",
+              "host": ["{{base_url}}"],
+              "path": ["v3", "brokers"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refresh_token",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

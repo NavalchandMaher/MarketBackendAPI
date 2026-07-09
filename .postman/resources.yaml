@@ -1,0 +1,7 @@
+# Use this workspace to collaborate
+workspace:
+  id: 16d1dad6-0636-4ae7-9957-df1eefab1f70
+
+localResources:
+  collections:
+    - ..\Market_AI_V3_Postman_Collection.json

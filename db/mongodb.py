@@ -67,6 +67,10 @@ daily_reports = db["daily_reports"]
 strategy_history = db["strategy_history"]
 
 users = db["users"]
+user_settings = db["user_settings"]
+user_broker = db["user_broker"]
+user_account = db["user_account"]
+refresh_tokens = db["refresh_tokens"]
 
 settings = db["settings"]
 

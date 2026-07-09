@@ -1,0 +1,575 @@
+{
+  "info": {
+    "name": "Market AI V3 - Backend API",
+    "version": "3.0.0",
+    "description": "Complete API documentation for Market AI Trading Platform V3",
+    "baseUrl": "http://localhost:8000",
+    "baseUrlProduction": "https://your-production-api.com",
+    "authentication": "Bearer Token (JWT)",
+    "lastUpdated": "2026-07-09"
+  },
+  "endpoints": {
+    "auth": [
+      {
+        "name": "Register User",
+        "method": "POST",
+        "path": "/auth/register",
+        "statusCode": 201,
+        "description": "Create a new user account",
+        "requiresAuth": false,
+        "requestBody": {
+          "full_name": "string (required)",
+          "email": "string (required, valid email)",
+          "password": "string (required)",
+          "mobile_number": "string (optional)",
+          "role": "string (optional, default: Trader)",
+          "default_symbol": "string (optional, default: BTCUSDT)",
+          "default_timeframe": "string (optional, default: 5m)",
+          "theme": "string (optional, default: dark)",
+          "notification_settings": "object (optional)"
+        }
+      },
+      {
+        "name": "Login User",
+        "method": "POST",
+        "path": "/auth/login",
+        "statusCode": 200,
+        "description": "Authenticate and get JWT tokens",
+        "requiresAuth": false,
+        "requestBody": {
+          "email": "string (required)",
+          "password": "string (required)"
+        }
+      },
+      {
+        "name": "Refresh Token",
+        "method": "POST",
+        "path": "/auth/refresh",
+        "statusCode": 200,
+        "description": "Get new access token using refresh token",
+        "requiresAuth": false,
+        "requestBody": {
+          "refresh_token": "string (required)"
+        }
+      },
+      {
+        "name": "Logout",
+        "method": "POST",
+        "path": "/auth/logout",
+        "statusCode": 200,
+        "description": "Logout current user",
+        "requiresAuth": true,
+        "requestBody": {}
+      },
+      {
+        "name": "Forgot Password",
+        "method": "POST",
+        "path": "/auth/forgot-password",
+        "statusCode": 200,
+        "description": "Request password reset",
+        "requiresAuth": false,
+        "requestBody": {
+          "email": "string (required)"
+        }
+      },
+      {
+        "name": "Reset Password",
+        "method": "POST",
+        "path": "/auth/reset-password",
+        "statusCode": 200,
+        "description": "Reset password with token",
+        "requiresAuth": false,
+        "requestBody": {
+          "token": "string (required)",
+          "new_password": "string (required)"
+        }
+      },
+      {
+        "name": "Change Password",
+        "method": "POST",
+        "path": "/auth/change-password",
+        "statusCode": 200,
+        "description": "Change password while logged in",
+        "requiresAuth": true,
+        "requestBody": {
+          "current_password": "string (required)",
+          "new_password": "string (required)"
+        }
+      }
+    ],
+    "users": [
+      {
+        "name": "Get Current User",
+        "method": "GET",
+        "path": "/users/me",
+        "statusCode": 200,
+        "description": "Get authenticated user profile",
+        "requiresAuth": true,
+        "queryParameters": []
+      },
+      {
+        "name": "Update User Profile",
+        "method": "PUT",
+        "path": "/users/me",
+        "statusCode": 200,
+        "description": "Update user profile",
+        "requiresAuth": true,
+        "requestBody": {
+          "full_name": "string (optional)",
+          "mobile_number": "string (optional)",
+          "default_symbol": "string (optional)",
+          "default_timeframe": "string (optional)",
+          "theme": "string (optional)",
+          "notification_settings": "object (optional)"
+        }
+      },
+      {
+        "name": "List All Users",
+        "method": "GET",
+        "path": "/users",
+        "statusCode": 200,
+        "description": "List all users (Admin only)",
+        "requiresAuth": true,
+        "requiresRole": "Admin"
+      },
+      {
+        "name": "Get User by ID",
+        "method": "GET",
+        "path": "/users/{user_id}",
+        "statusCode": 200,
+        "description": "Get specific user (Admin only)",
+        "requiresAuth": true,
+        "requiresRole": "Admin",
+        "pathParameters": {
+          "user_id": "string"
+        }
+      },
+      {
+        "name": "Update User",
+        "method": "PUT",
+        "path": "/users/{user_id}",
+        "statusCode": 200,
+        "description": "Update user (Admin only)",
+        "requiresAuth": true,
+        "requiresRole": "Admin",
+        "pathParameters": {
+          "user_id": "string"
+        }
+      },
+      {
+        "name": "Delete User",
+        "method": "DELETE",
+        "path": "/users/{user_id}",
+        "statusCode": 200,
+        "description": "Delete user (Admin only)",
+        "requiresAuth": true,
+        "requiresRole": "Admin",
+        "pathParameters": {
+          "user_id": "string"
+        }
+      }
+    ],
+    "v3": [
+      {
+        "name": "Dashboard Summary",
+        "method": "GET",
+        "path": "/v3/dashboard",
+        "statusCode": 200,
+        "requiresAuth": true
+      },
+      {
+        "name": "List Strategies",
+        "method": "GET",
+        "path": "/v3/strategies",
+        "statusCode": 200,
+        "requiresAuth": true
+      },
+      {
+        "name": "Get Strategy",
+        "method": "GET",
+        "path": "/v3/strategies/{strategy_id}",
+        "statusCode": 200,
+        "requiresAuth": true,
+        "pathParameters": {
+          "strategy_id": "string"
+        }
+      },
+      {
+        "name": "Create Strategy",
+        "method": "POST",
+        "path": "/v3/strategies",
+        "statusCode": 201,
+        "requiresAuth": true
+      },
+      {
+        "name": "Update Strategy",
+        "method": "PUT",
+        "path": "/v3/strategies/{strategy_id}",
+        "statusCode": 200,
+        "requiresAuth": true,
+        "pathParameters": {
+          "strategy_id": "string"
+        }
+      },
+      {
+        "name": "Delete Strategy",
+        "method": "DELETE",
+        "path": "/v3/strategies/{strategy_id}",
+        "statusCode": 200,
+        "requiresAuth": true,
+        "pathParameters": {
+          "strategy_id": "string"
+        }
+      },
+      {
+        "name": "Run Backtest",
+        "method": "POST",
+        "path": "/v3/backtest/run",
+        "statusCode": 200,
+        "requiresAuth": true
+      },
+      {
+        "name": "Get Backtest",
+        "method": "GET",
+        "path": "/v3/backtest/{backtest_id}",
+        "statusCode": 200,
+        "requiresAuth": true,
+        "pathParameters": {
+          "backtest_id": "string"
+        }
+      },
+      {
+        "name": "List Backtests",
+        "method": "GET",
+        "path": "/v3/backtest/history",
+        "statusCode": 200,
+        "requiresAuth": true
+      },
+      {
+        "name": "Delete Backtest",
+        "method": "DELETE",
+        "path": "/v3/backtest/{backtest_id}",
+        "statusCode": 200,
+        "requiresAuth": true,
+        "pathParameters": {
+          "backtest_id": "string"
+        }
+      },
+      {
+        "name": "Paper Trading - Start",
+        "method": "POST",
+        "path": "/v3/paper/start",
+        "statusCode": 200,
+        "requiresAuth": true
+      },
+      {
+        "name": "Paper Trading - Stop",
+        "method": "POST",
+        "path": "/v3/paper/stop",
+        "statusCode": 200,
+        "requiresAuth": true
+      },
+      {
+        "name": "Paper Trading - Status",
+        "method": "GET",
+        "path": "/v3/paper/status",
+        "statusCode": 200,
+        "requiresAuth": true
+      },
+      {
+        "name": "Paper Trading - Open Trades",
+        "method": "GET",
+        "path": "/v3/paper/open",
+        "statusCode": 200,
+        "requiresAuth": true
+      },
+      {
+        "name": "Paper Trading - History",
+        "method": "GET",
+        "path": "/v3/paper/history",
+        "statusCode": 200,
+        "requiresAuth": true
+      },
+      {
+        "name": "Paper Trading - Statistics",
+        "method": "GET",
+        "path": "/v3/paper/statistics",
+        "statusCode": 200,
+        "requiresAuth": true
+      },
+      {
+        "name": "List Brokers",
+        "method": "GET",
+        "path": "/v3/brokers",
+        "statusCode": 200,
+        "requiresAuth": false
+      },
+      {
+        "name": "Connect Broker",
+        "method": "POST",
+        "path": "/v3/broker/connect",
+        "statusCode": 200,
+        "requiresAuth": true
+      },
+      {
+        "name": "Test Broker",
+        "method": "POST",
+        "path": "/v3/broker/test",
+        "statusCode": 200,
+        "requiresAuth": true
+      },
+      {
+        "name": "Disconnect Broker",
+        "method": "POST",
+        "path": "/v3/broker/disconnect",
+        "statusCode": 200,
+        "requiresAuth": true
+      },
+      {
+        "name": "Reports - Dashboard",
+        "method": "GET",
+        "path": "/v3/reports/dashboard",
+        "statusCode": 200,
+        "requiresAuth": true
+      },
+      {
+        "name": "Reports - Daily",
+        "method": "GET",
+        "path": "/v3/reports/daily",
+        "statusCode": 200,
+        "requiresAuth": true
+      },
+      {
+        "name": "Reports - Monthly",
+        "method": "GET",
+        "path": "/v3/reports/monthly",
+        "statusCode": 200,
+        "requiresAuth": true
+      },
+      {
+        "name": "Reports - Yearly",
+        "method": "GET",
+        "path": "/v3/reports/yearly",
+        "statusCode": 200,
+        "requiresAuth": true
+      },
+      {
+        "name": "Reports - Equity",
+        "method": "GET",
+        "path": "/v3/reports/equity",
+        "statusCode": 200,
+        "requiresAuth": true
+      },
+      {
+        "name": "Reports - Performance",
+        "method": "GET",
+        "path": "/v3/reports/performance",
+        "statusCode": 200,
+        "requiresAuth": true
+      },
+      {
+        "name": "Learning History",
+        "method": "GET",
+        "path": "/v3/learning",
+        "statusCode": 200,
+        "requiresAuth": true
+      },
+      {
+        "name": "Latest Learning",
+        "method": "GET",
+        "path": "/v3/learning/latest",
+        "statusCode": 200,
+        "requiresAuth": true
+      },
+      {
+        "name": "Scheduler Jobs",
+        "method": "GET",
+        "path": "/v3/scheduler/jobs",
+        "statusCode": 200,
+        "requiresAuth": true
+      },
+      {
+        "name": "Scheduler - Start",
+        "method": "POST",
+        "path": "/v3/scheduler/start",
+        "statusCode": 200,
+        "requiresAuth": true
+      },
+      {
+        "name": "Scheduler - Stop",
+        "method": "POST",
+        "path": "/v3/scheduler/stop",
+        "statusCode": 200,
+        "requiresAuth": true
+      },
+      {
+        "name": "Get Settings",
+        "method": "GET",
+        "path": "/v3/settings",
+        "statusCode": 200,
+        "requiresAuth": true
+      },
+      {
+        "name": "Update Settings",
+        "method": "PUT",
+        "path": "/v3/settings",
+        "statusCode": 200,
+        "requiresAuth": true
+      },
+      {
+        "name": "Get Account",
+        "method": "GET",
+        "path": "/v3/account",
+        "statusCode": 200,
+        "requiresAuth": true
+      },
+      {
+        "name": "Update Account",
+        "method": "PUT",
+        "path": "/v3/account",
+        "statusCode": 200,
+        "requiresAuth": true
+      },
+      {
+        "name": "Get Symbols",
+        "method": "GET",
+        "path": "/v3/symbols",
+        "statusCode": 200,
+        "requiresAuth": false
+      },
+      {
+        "name": "Get Timeframes",
+        "method": "GET",
+        "path": "/v3/timeframes",
+        "statusCode": 200,
+        "requiresAuth": false
+      }
+    ],
+    "legacy": [
+      {
+        "name": "Market Analysis",
+        "method": "GET",
+        "path": "/analysis",
+        "statusCode": 200,
+        "queryParameters": {
+          "symbol": "string (default: BTCUSDT)",
+          "timeframe": "string (default: 5m)"
+        }
+      },
+      {
+        "name": "Paper Trades Dashboard",
+        "method": "GET",
+        "path": "/paper-trades",
+        "statusCode": 200,
+        "requiresAuth": true
+      },
+      {
+        "name": "Paper Trades History",
+        "method": "GET",
+        "path": "/paper-trades/history",
+        "statusCode": 200,
+        "requiresAuth": true,
+        "queryParameters": {
+          "limit": "integer (default: 100)"
+        }
+      },
+      {
+        "name": "Current Strategy",
+        "method": "GET",
+        "path": "/strategy",
+        "statusCode": 200,
+        "requiresAuth": true
+      },
+      {
+        "name": "Performance Dashboard",
+        "method": "GET",
+        "path": "/performance",
+        "statusCode": 200,
+        "requiresAuth": true
+      },
+      {
+        "name": "Learning Logs",
+        "method": "GET",
+        "path": "/learning-logs",
+        "statusCode": 200,
+        "requiresAuth": true
+      },
+      {
+        "name": "Backtest",
+        "method": "GET",
+        "path": "/backtest",
+        "statusCode": 200,
+        "requiresAuth": true,
+        "queryParameters": {
+          "symbol": "string (default: BTCUSDT)",
+          "timeframe": "string (default: 5m)",
+          "days": "integer (default: 365)"
+        }
+      },
+      {
+        "name": "Backtest History",
+        "method": "GET",
+        "path": "/backtest/history",
+        "statusCode": 200,
+        "requiresAuth": true
+      },
+      {
+        "name": "Scheduler Status",
+        "method": "GET",
+        "path": "/scheduler/status",
+        "statusCode": 200
+      },
+      {
+        "name": "Scheduler Dashboard",
+        "method": "GET",
+        "path": "/scheduler/dashboard",
+        "statusCode": 200
+      },
+      {
+        "name": "Run Market Cycle",
+        "method": "POST",
+        "path": "/scheduler/run-market",
+        "statusCode": 200
+      },
+      {
+        "name": "Run Nightly Cycle",
+        "method": "POST",
+        "path": "/scheduler/run-nightly",
+        "statusCode": 200
+      }
+    ]
+  },
+  "headers": {
+    "default": {
+      "Content-Type": "application/json",
+      "Accept": "application/json"
+    },
+    "authenticated": {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      "Authorization": "Bearer {access_token}"
+    }
+  },
+  "statusCodes": {
+    "200": "OK - Request successful",
+    "201": "Created - Resource created successfully",
+    "400": "Bad Request - Invalid parameters",
+    "401": "Unauthorized - Missing or invalid token",
+    "403": "Forbidden - Insufficient permissions",
+    "404": "Not Found - Resource not found",
+    "422": "Unprocessable Entity - Validation error",
+    "500": "Internal Server Error"
+  },
+  "authentication": {
+    "type": "OAuth2 with JWT",
+    "tokenType": "Bearer",
+    "algorithm": "HS256",
+    "accessTokenExpiry": "30 minutes",
+    "refreshTokenExpiry": "7 days",
+    "passwordHashing": "bcrypt (12 rounds)"
+  },
+  "rateLimit": {
+    "requestsPerMinute": 60,
+    "requestsPerHour": 1000
+  }
+}

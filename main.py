@@ -1,9 +1,11 @@
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
 from db.mongodb import learning_logs
 from services.signal_engine import analyze_market
 from routes.v3_routes import router as v3_router
+from routes.auth_routes import router as auth_router
+from routes.user_routes import router as user_router
 
 from services.backtester import BackTester
 from db.mongodb import backtest_results
@@ -16,6 +18,7 @@ from db.mongodb import paper_trades, closed_trades
 from services.performance_service import PerformanceService
 
 from services.learning_engine import LearningEngine
+from services.auth_service import AuthService
 
 
 @asynccontextmanager
@@ -39,6 +42,8 @@ app.add_middleware(
 )
 
 app.include_router(v3_router)
+app.include_router(auth_router)
+app.include_router(user_router)
 
 
 @app.get("/analysis")
@@ -47,22 +52,23 @@ def analysis(symbol: str = Query("BTCUSDT"), timeframe: str = Query("5m")):
 
 
 @app.get("/paper-trades")
-def get_trade_dashboard():
+def get_trade_dashboard(user=Depends(AuthService.get_current_user)):
+    user_id = str(user.get("_id"))
 
-    open_trades = paper_trades.count_documents({"status": "OPEN"})
+    open_trades = paper_trades.count_documents({"status": "OPEN", "user_id": user_id})
 
-    closed_count = closed_trades.count_documents({})
+    closed_count = closed_trades.count_documents({"user_id": user_id})
 
-    wins = closed_trades.count_documents({"result": "WIN"})
+    wins = closed_trades.count_documents({"result": "WIN", "user_id": user_id})
 
-    losses = closed_trades.count_documents({"result": "LOSS"})
+    losses = closed_trades.count_documents({"result": "LOSS", "user_id": user_id})
 
     win_rate = 0
 
     if closed_count > 0:
         win_rate = round((wins / closed_count) * 100, 2)
 
-    pipeline = [{"$group": {"_id": None, "profit": {"$sum": "$pnl"}}}]
+    pipeline = [{"$match": {"user_id": user_id}}, {"$group": {"_id": None, "profit": {"$sum": "$pnl"}}}]
 
     result = list(closed_trades.aggregate(pipeline))
 
@@ -79,9 +85,10 @@ def get_trade_dashboard():
 
 
 @app.get("/learning-logs")
-def get_learning_logs():
+def get_learning_logs(user=Depends(AuthService.get_current_user)):
+    user_id = str(user.get("_id"))
 
-    logs = list(learning_logs.find().sort("created_at", -1).limit(50))
+    logs = list(learning_logs.find({"user_id": user_id}).sort("created_at", -1).limit(50))
     response = []
 
     for log in logs:
@@ -113,9 +120,10 @@ def get_learning_logs():
 
 
 @app.get("/strategy")
-def current_strategy():
+def current_strategy(user=Depends(AuthService.get_current_user)):
+    user_id = str(user.get("_id"))
 
-    strategy = LearningEngine.active_strategy()
+    strategy = LearningEngine.active_strategy(user_id=user_id)
 
     if not strategy:
 
@@ -136,19 +144,21 @@ def current_strategy():
 
 
 @app.get("/performance")
-def performance():
+def performance(user=Depends(AuthService.get_current_user)):
+    user_id = str(user.get("_id"))
 
-    return PerformanceService.dashboard()
+    return PerformanceService.dashboard(user_id=user_id)
 
 
 from itertools import chain
 
 
 @app.get("/paper-trades/history")
-def get_trade_history(limit: int = 100):
+def get_trade_history(limit: int = 100, user=Depends(AuthService.get_current_user)):
+    user_id = str(user.get("_id"))
 
-    open_list = list(paper_trades.find())
-    closed_list = list(closed_trades.find())
+    open_list = list(paper_trades.find({"user_id": user_id}))
+    closed_list = list(closed_trades.find({"user_id": user_id}))
 
     trades = sorted(
         chain(open_list, closed_list), key=lambda x: x.get("entry_time"), reverse=True
@@ -184,15 +194,16 @@ def get_trade_history(limit: int = 100):
 
 @app.get("/backtest")
 def backtest(
-    symbol: str = Query("BTCUSDT"), timeframe: str = Query("5m"), days: int = Query(365)
+    symbol: str = Query("BTCUSDT"), timeframe: str = Query("5m"), days: int = Query(365), user=Depends(AuthService.get_current_user)
 ):
     return BackTester.run(symbol=symbol, timeframe=timeframe, days=days)
 
 
 @app.get("/backtest/history")
-def backtest_history():
+def backtest_history(user=Depends(AuthService.get_current_user)):
+    user_id = str(user.get("_id"))
 
-    data = list(backtest_results.find({}, {"_id": 0}))
+    data = list(backtest_results.find({"user_id": user_id}, {"_id": 0}))
 
     return data
 

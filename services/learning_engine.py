@@ -19,18 +19,22 @@ class LearningEngine:
     # ==========================================================
 
     @staticmethod
-    def closed_trades():
-
-        return list(closed_trades.find().sort("closed_at", -1))
+    def closed_trades(user_id=None):
+        query = {}
+        if user_id:
+            query["user_id"] = user_id
+        return list(closed_trades.find(query).sort("closed_at", -1))
 
     # ==========================================================
     # LOAD ACTIVE STRATEGY
     # ==========================================================
 
     @staticmethod
-    def active_strategy():
-
-        strategy = strategies.find_one({"enabled": True})
+    def active_strategy(user_id=None):
+        query = {"enabled": True}
+        if user_id:
+            query["user_id"] = user_id
+        strategy = strategies.find_one(query)
 
         if strategy:
 
@@ -43,9 +47,11 @@ class LearningEngine:
     # ==========================================================
 
     @staticmethod
-    def strategy(version):
-
-        strategy = strategies.find_one({"version": version})
+    def strategy(version, user_id=None):
+        query = {"version": version}
+        if user_id:
+            query["user_id"] = user_id
+        strategy = strategies.find_one(query)
 
         if strategy:
 
@@ -92,11 +98,12 @@ class LearningEngine:
     # ==========================================================
 
     @staticmethod
-    def logs(limit=100):
-
+    def logs(limit=100, user_id=None):
         logs = []
-
-        cursor = learning_logs.find().sort("created_at", -1).limit(limit)
+        query = {}
+        if user_id:
+            query["user_id"] = user_id
+        cursor = learning_logs.find(query).sort("created_at", -1).limit(limit)
 
         for log in cursor:
 
@@ -111,43 +118,49 @@ class LearningEngine:
     # ==========================================================
 
     @staticmethod
-    def save_log(title, details, strategy_version):
-
-        learning_logs.insert_one(
-            {
-                "title": title,
-                "details": details,
-                "strategy_version": strategy_version,
-                "created_at": datetime.utcnow(),
-            }
-        )
+    def save_log(title, details, strategy_version, user_id=None):
+        log_doc = {
+            "title": title,
+            "details": details,
+            "strategy_version": strategy_version,
+            "created_at": datetime.utcnow(),
+        }
+        if user_id:
+            log_doc["user_id"] = user_id
+        learning_logs.insert_one(log_doc)
 
     # ==========================================================
     # TOTAL CLOSED TRADES
     # ==========================================================
 
     @staticmethod
-    def total_closed_trades():
-
-        return closed_trades.count_documents({})
+    def total_closed_trades(user_id=None):
+        query = {}
+        if user_id:
+            query["user_id"] = user_id
+        return closed_trades.count_documents(query)
 
     # ==========================================================
     # WINNING TRADES
     # ==========================================================
 
     @staticmethod
-    def winning_trades():
-
-        return list(closed_trades.find({"result": "WIN"}))
+    def winning_trades(user_id=None):
+        query = {"result": "WIN"}
+        if user_id:
+            query["user_id"] = user_id
+        return list(closed_trades.find(query))
 
     # ==========================================================
     # LOSING TRADES
     # ==========================================================
 
     @staticmethod
-    def losing_trades():
-
-        return list(closed_trades.find({"result": "LOSS"}))
+    def losing_trades(user_id=None):
+        query = {"result": "LOSS"}
+        if user_id:
+            query["user_id"] = user_id
+        return list(closed_trades.find(query))
 
     # ==========================================================
     # HEALTH

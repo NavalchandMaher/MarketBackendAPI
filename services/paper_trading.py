@@ -61,23 +61,22 @@ class PaperTrading:
     # ======================================================
 
     @staticmethod
-    def trade_exists(symbol, timeframe):
-
-        return (
-            paper_trades.find_one(
-                {"symbol": symbol, "timeframe": timeframe, "status": "OPEN"}
-            )
-            is not None
-        )
+    def trade_exists(symbol, timeframe, user_id=None):
+        query = {"symbol": symbol, "timeframe": timeframe, "status": "OPEN"}
+        if user_id:
+            query["user_id"] = user_id
+        return paper_trades.find_one(query) is not None
 
     # ======================================================
     # OPEN TRADE LIMIT
     # ======================================================
 
     @staticmethod
-    def max_trade_limit_reached():
-
-        count = paper_trades.count_documents({"status": "OPEN"})
+    def max_trade_limit_reached(user_id=None):
+        query = {"status": "OPEN"}
+        if user_id:
+            query["user_id"] = user_id
+        count = paper_trades.count_documents(query)
 
         return count >= MAX_OPEN_TRADES
 
@@ -154,11 +153,13 @@ class PaperTrading:
 
             timeframe = trade_data["timeframe"]
 
-            if PaperTrading.trade_exists(symbol, timeframe):
+            user_id = trade_data.get("user_id")
+
+            if PaperTrading.trade_exists(symbol, timeframe, user_id=user_id):
 
                 return {"success": False, "message": "Open trade already exists."}
 
-            if PaperTrading.max_trade_limit_reached():
+            if PaperTrading.max_trade_limit_reached(user_id=user_id):
 
                 return {"success": False, "message": "Maximum open trades reached."}
 
@@ -190,6 +191,9 @@ class PaperTrading:
                 sl_percent=sl_percent,
             )
 
+            if user_id:
+                trade["user_id"] = user_id
+
             result = paper_trades.insert_one(trade)
 
             trade["_id"] = str(result.inserted_id)
@@ -216,11 +220,15 @@ class PaperTrading:
     # ======================================================
 
     @staticmethod
-    def get_open_trades():
+    def get_open_trades(user_id=None):
 
         trades = []
 
-        cursor = paper_trades.find({"status": "OPEN"}).sort("created_at", -1)
+        query = {"status": "OPEN"}
+        if user_id:
+            query["user_id"] = user_id
+
+        cursor = paper_trades.find(query).sort("created_at", -1)
 
         for trade in cursor:
 
@@ -235,11 +243,15 @@ class PaperTrading:
     # ======================================================
 
     @staticmethod
-    def get_closed_trades(limit=100):
+    def get_closed_trades(limit=100, user_id=None):
 
         trades = []
 
-        cursor = closed_trades.find().sort("closed_at", -1).limit(limit)
+        query = {}
+        if user_id:
+            query["user_id"] = user_id
+
+        cursor = closed_trades.find(query).sort("closed_at", -1).limit(limit)
 
         for trade in cursor:
 
@@ -254,11 +266,15 @@ class PaperTrading:
     # ======================================================
 
     @staticmethod
-    def get_all_trades(limit=500):
+    def get_all_trades(limit=500, user_id=None):
 
         trades = []
 
-        cursor = paper_trades.find().sort("created_at", -1).limit(limit)
+        query = {}
+        if user_id:
+            query["user_id"] = user_id
+
+        cursor = paper_trades.find(query).sort("created_at", -1).limit(limit)
 
         for trade in cursor:
 
@@ -273,9 +289,13 @@ class PaperTrading:
     # ======================================================
 
     @staticmethod
-    def get_trade(trade_id):
+    def get_trade(trade_id, user_id=None):
 
-        trade = paper_trades.find_one({"trade_id": trade_id})
+        query = {"trade_id": trade_id}
+        if user_id:
+            query["user_id"] = user_id
+
+        trade = paper_trades.find_one(query)
 
         if trade:
 
@@ -288,7 +308,7 @@ class PaperTrading:
     # ======================================================
 
     @staticmethod
-    def trade_history(symbol=None, strategy=None, status=None):
+    def trade_history(symbol=None, strategy=None, status=None, user_id=None):
 
         query = {}
 
@@ -321,11 +341,15 @@ class PaperTrading:
     # ======================================================
 
     @staticmethod
-    def update_trade(trade_id, update_data):
+    def update_trade(trade_id, update_data, user_id=None):
 
         update_data["updated_at"] = datetime.utcnow()
 
-        result = paper_trades.update_one({"trade_id": trade_id}, {"$set": update_data})
+        query = {"trade_id": trade_id}
+        if user_id:
+            query["user_id"] = user_id
+
+        result = paper_trades.update_one(query, {"$set": update_data})
 
         return result.modified_count > 0
 
@@ -334,9 +358,13 @@ class PaperTrading:
     # ======================================================
 
     @staticmethod
-    def delete_trade(trade_id):
+    def delete_trade(trade_id, user_id=None):
 
-        result = paper_trades.delete_one({"trade_id": trade_id})
+        query = {"trade_id": trade_id}
+        if user_id:
+            query["user_id"] = user_id
+
+        result = paper_trades.delete_one(query)
 
         return result.deleted_count > 0
 
@@ -345,20 +373,26 @@ class PaperTrading:
     # ======================================================
 
     @staticmethod
-    def open_trade_count():
-
-        return paper_trades.count_documents({"status": "OPEN"})
+    def open_trade_count(user_id=None):
+        query = {"status": "OPEN"}
+        if user_id:
+            query["user_id"] = user_id
+        return paper_trades.count_documents(query)
 
     # ======================================================
     # OPEN TRADES BY SYMBOL
     # ======================================================
 
     @staticmethod
-    def get_symbol_trades(symbol):
+    def get_symbol_trades(symbol, user_id=None):
 
         trades = []
 
-        cursor = paper_trades.find({"symbol": symbol, "status": "OPEN"})
+        query = {"symbol": symbol, "status": "OPEN"}
+        if user_id:
+            query["user_id"] = user_id
+
+        cursor = paper_trades.find(query)
 
         for trade in cursor:
 
@@ -374,9 +408,13 @@ class PaperTrading:
     # ======================================================
 
     @staticmethod
-    def close_trade(trade_id, exit_price, reason="TARGET"):
+    def close_trade(trade_id, exit_price, reason="TARGET", user_id=None):
 
-        trade = paper_trades.find_one({"trade_id": trade_id})
+        query = {"trade_id": trade_id}
+        if user_id:
+            query["user_id"] = user_id
+
+        trade = paper_trades.find_one(query)
 
         if not trade:
 
@@ -429,11 +467,19 @@ class PaperTrading:
     # ======================================================
 
     @staticmethod
-    def account_summary():
+    def account_summary(user_id=None):
 
-        open_trades = paper_trades.count_documents({"status": "OPEN"})
+        query = {"status": "OPEN"}
+        if user_id:
+            query["user_id"] = user_id
 
-        closed = list(closed_trades.find())
+        open_trades = paper_trades.count_documents(query)
+
+        closed_query = {}
+        if user_id:
+            closed_query["user_id"] = user_id
+
+        closed = list(closed_trades.find(closed_query))
 
         wins = sum(1 for t in closed if t["result"] == "WIN")
 
@@ -465,9 +511,13 @@ class PaperTrading:
     # ======================================================
 
     @staticmethod
-    def total_pnl():
+    def total_pnl(user_id=None):
 
-        trades = closed_trades.find()
+        query = {}
+        if user_id:
+            query["user_id"] = user_id
+
+        trades = closed_trades.find(query)
 
         return round(sum(t["pnl"] for t in trades), 2)
 
@@ -476,11 +526,15 @@ class PaperTrading:
     # ======================================================
 
     @staticmethod
-    def reset():
+    def reset(user_id=None):
 
-        paper_trades.delete_many({})
+        query = {}
+        if user_id:
+            query["user_id"] = user_id
 
-        closed_trades.delete_many({})
+        paper_trades.delete_many(query)
+
+        closed_trades.delete_many(query)
 
         PaperTrading.balance = INITIAL_BALANCE
 
@@ -491,10 +545,10 @@ class PaperTrading:
     # ======================================================
 
     @staticmethod
-    def dashboard():
+    def dashboard(user_id=None):
 
         return {
-            "account": PaperTrading.account_summary(),
-            "open": PaperTrading.get_open_trades(),
-            "history": PaperTrading.get_closed_trades(20),
+            "account": PaperTrading.account_summary(user_id=user_id),
+            "open": PaperTrading.get_open_trades(user_id=user_id),
+            "history": PaperTrading.get_closed_trades(20, user_id=user_id),
         }
