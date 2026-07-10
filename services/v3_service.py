@@ -178,7 +178,8 @@ class V3Service:
         })
 
     @staticmethod
-    def paper_stop() -> Dict[str, Any]:
+    def paper_stop(user_id: Optional[str] = None) -> Dict[str, Any]:
+        logger.info(f"[V3_SERVICE] Paper trading stopped for user: {user_id}")
         return {"success": True, "message": "Paper trading stopped."}
 
     @staticmethod
@@ -227,14 +228,36 @@ class V3Service:
         return {"success": True, "message": f"Broker disconnect requested for {payload.get('broker', 'unknown')}"}
 
     @staticmethod
-    def report_dashboard() -> Dict[str, Any]:
+    def report_dashboard(user_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Generate user-scoped performance report.
+        If user_id is provided, returns user-specific metrics.
+        Otherwise returns system-wide metrics.
+        """
+        query = V3Service._build_user_scope(user_id)
+        
+        total_trades = closed_trades.count_documents(query)
+        wins = closed_trades.count_documents({"result": "WIN", **query})
+        losses = closed_trades.count_documents({"result": "LOSS", **query})
+        
+        win_rate = round((wins / total_trades * 100), 2) if total_trades > 0 else 0
+        
+        # Calculate PnL
+        pipeline = [{"$match": query}, {"$group": {"_id": None, "total_pnl": {"$sum": "$pnl"}}}]
+        pnl_result = list(closed_trades.aggregate(pipeline))
+        total_pnl = pnl_result[0]["total_pnl"] if pnl_result else 0
+        
+        logger.info(f"[V3_SERVICE] Generated report for user {user_id}: {total_trades} trades, {win_rate}% win rate")
+        
         return {
-            "win_rate": 0,
-            "pnl": 0,
-            "trades": 0,
-            "drawdown": 0,
-            "profit_factor": 0,
-            "sharpe_ratio": 0,
+            "total_trades": total_trades,
+            "wins": wins,
+            "losses": losses,
+            "win_rate": win_rate,
+            "total_pnl": round(total_pnl, 2),
+            "profit_factor": (wins / losses) if losses > 0 else 0,
+            "drawdown": 0,  # Calculate if needed from equity curve
+            "sharpe_ratio": 0,  # Calculate if needed from returns
             "equity_curve": [],
         }
 

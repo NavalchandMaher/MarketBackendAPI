@@ -121,8 +121,8 @@ def paper_start(user=Depends(AuthService.get_current_user)):
 
 
 @router.post("/paper/stop")
-def paper_stop():
-    return V3Service.paper_stop()
+def paper_stop(user=Depends(AuthService.get_current_user)):
+    return V3Service.paper_stop(user_id=str(user["_id"]))
 
 
 @router.get("/paper/status")
@@ -166,33 +166,33 @@ def broker_disconnect(payload: BrokerPayload):
 
 
 @router.get("/reports/dashboard")
-def reports_dashboard():
-    return V3Service.report_dashboard()
+def reports_dashboard(user=Depends(AuthService.get_current_user)):
+    return V3Service.report_dashboard(user_id=str(user["_id"]))
 
 
 @router.get("/reports/daily")
-def reports_daily():
-    return V3Service.report_dashboard()
+def reports_daily(user=Depends(AuthService.get_current_user)):
+    return V3Service.report_dashboard(user_id=str(user["_id"]))
 
 
 @router.get("/reports/monthly")
-def reports_monthly():
-    return V3Service.report_dashboard()
+def reports_monthly(user=Depends(AuthService.get_current_user)):
+    return V3Service.report_dashboard(user_id=str(user["_id"]))
 
 
 @router.get("/reports/yearly")
-def reports_yearly():
-    return V3Service.report_dashboard()
+def reports_yearly(user=Depends(AuthService.get_current_user)):
+    return V3Service.report_dashboard(user_id=str(user["_id"]))
 
 
 @router.get("/reports/equity")
-def reports_equity():
-    return V3Service.report_dashboard()
+def reports_equity(user=Depends(AuthService.get_current_user)):
+    return V3Service.report_dashboard(user_id=str(user["_id"]))
 
 
 @router.get("/reports/performance")
-def reports_performance():
-    return V3Service.report_dashboard()
+def reports_performance(user=Depends(AuthService.get_current_user)):
+    return V3Service.report_dashboard(user_id=str(user["_id"]))
 
 
 @router.get("/learning")

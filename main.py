@@ -35,12 +35,15 @@ app = FastAPI(title="Market AI V2", version="3.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:54646",
+        "http://localhost:3000",
+        "http://127.0.0.1:54646",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 app.include_router(v3_router)
 app.include_router(auth_router)
 app.include_router(user_router)
@@ -196,7 +199,8 @@ def get_trade_history(limit: int = 100, user=Depends(AuthService.get_current_use
 def backtest(
     symbol: str = Query("BTCUSDT"), timeframe: str = Query("5m"), days: int = Query(365), user=Depends(AuthService.get_current_user)
 ):
-    return BackTester.run(symbol=symbol, timeframe=timeframe, days=days)
+    user_id = str(user.get("_id"))
+    return BackTester.run(symbol=symbol, timeframe=timeframe, days=days, user_id=user_id)
 
 
 @app.get("/backtest/history")
