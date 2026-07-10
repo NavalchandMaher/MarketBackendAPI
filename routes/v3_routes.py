@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from typing import Any, Dict, Optional
 
 from services.v3_service import V3Service
 from services.auth_service import AuthService
+from services.signal_engine import analyze_market
+from services.scheduler_service import SchedulerService
 
 router = APIRouter(prefix="/v3", tags=["v3"])
 
@@ -55,6 +57,11 @@ class AccountPayload(BaseModel):
 @router.get("/dashboard")
 def dashboard(user=Depends(AuthService.get_current_user)):
     return V3Service.dashboard_summary(user_id=str(user["_id"]))
+
+
+@router.get("/analysis")
+def analysis(symbol: str = Query("BTCUSDT"), timeframe: str = Query("5m")):
+    return analyze_market(symbol, timeframe)
 
 
 @router.get("/strategies")
@@ -210,6 +217,16 @@ def scheduler_jobs():
     return V3Service.scheduler_jobs()
 
 
+@router.get("/scheduler/status")
+def scheduler_status():
+    return SchedulerService.status()
+
+
+@router.get("/scheduler/dashboard")
+def scheduler_dashboard():
+    return SchedulerService.dashboard()
+
+
 @router.post("/scheduler/start")
 def scheduler_start():
     return {"success": True, "message": "Scheduler start requested."}
@@ -218,6 +235,16 @@ def scheduler_start():
 @router.post("/scheduler/stop")
 def scheduler_stop():
     return {"success": True, "message": "Scheduler stop requested."}
+
+
+@router.post("/scheduler/run-market")
+def run_market():
+    return SchedulerService.run_market_now()
+
+
+@router.post("/scheduler/run-nightly")
+def run_nightly():
+    return SchedulerService.run_nightly_now()
 
 
 @router.get("/settings")
