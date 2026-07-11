@@ -104,17 +104,17 @@ def run_backtest(payload: BacktestPayload, user=Depends(AuthService.get_current_
     return V3Service.run_backtest(data)
 
 
+@router.get("/backtest/history")
+def list_backtests(user=Depends(AuthService.get_current_user)):
+    return V3Service.list_backtests(user_id=str(user["_id"]))
+
+
 @router.get("/backtest/{backtest_id}")
 def get_backtest(backtest_id: str, user=Depends(AuthService.get_current_user)):
     backtest = V3Service.get_backtest(backtest_id, user_id=str(user["_id"]))
     if not backtest:
         raise HTTPException(status_code=404, detail="Backtest not found")
     return backtest
-
-
-@router.get("/backtest/history")
-def list_backtests(user=Depends(AuthService.get_current_user)):
-    return V3Service.list_backtests(user_id=str(user["_id"]))
 
 
 @router.delete("/backtest/{backtest_id}")
