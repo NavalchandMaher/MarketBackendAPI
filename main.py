@@ -35,12 +35,8 @@ app = FastAPI(title="Market AI V2", version="3.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:54646",
-        "http://localhost:3000",
-        "http://127.0.0.1:54646",
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
