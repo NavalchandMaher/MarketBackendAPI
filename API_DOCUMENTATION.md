@@ -2,7 +2,7 @@
 
 **Version:** 3.0.0  
 **Last Updated:** July 2026  
-**Environment:** Development (Localhost:8000)
+**Environment:** Development (Localhost:10000)
 
 ---
 
@@ -24,7 +24,7 @@
 
 **Development:**
 ```
-http://localhost:8000
+http://localhost:10000
 ```
 
 **Production:**

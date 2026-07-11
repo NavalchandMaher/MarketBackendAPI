@@ -16,7 +16,7 @@ import time
 from datetime import datetime
 
 # Configuration
-BASE_URL = "http://localhost:8000"
+BASE_URL = "http://localhost:10000"
 TEST_USER_EMAIL = f"test_auth_{int(time.time())}@example.com"
 TEST_USER_PASSWORD = "SecurePassword123!"
 TEST_USER_NAME = "Test Auth User"

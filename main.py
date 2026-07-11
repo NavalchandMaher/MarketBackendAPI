@@ -33,10 +33,16 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Market AI V2", version="3.0", lifespan=lifespan)
 
+ALLOWED_ORIGINS = [
+    "http://localhost:54646",  # Flutter web/devtools origin observed in UI
+    "http://localhost:10000",  # Backend origin
+    "http://127.0.0.1:10000",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -23,34 +23,22 @@ All these endpoints were moved to `v3_routes.py`:
 
 ### 2. ✅ Consolidated All V3 Endpoints in routes/v3_routes.py
 Added missing imports and endpoints:
-- ✓ Added `analyze_market` import
-- ✓ Added `SchedulerService` import  
-- ✓ Added `/v3/analysis` endpoint
-- ✓ Added `/v3/scheduler/status` endpoint
-- ✓ Added `/v3/scheduler/dashboard` endpoint
-- ✓ Added `/v3/scheduler/run-market` endpoint (POST)
-- ✓ Added `/v3/scheduler/run-nightly` endpoint (POST)
 
 **Impact**: Single source of truth for all V3 endpoints
 
 ### 3. ✅ Verified Route Definitions
 All methods (POST, PUT, DELETE, GET) are properly defined in v3_routes.py:
-- GET `/v3/strategies` ✓
-- POST `/v3/strategies` ✓
-- PUT `/v3/strategies/{id}` ✓
-- DELETE `/v3/strategies/{id}` ✓
 
----
 
 ## What Still Needs Attention
 
 ### 1. ⚠️ User Profile Not Showing Full Name
 **Issue**: Profile shows "User" instead of actual username
 **File**: `lib/state/auth_state.dart`
-**Line**: `String get userName => _currentUser?['full_name'] ?? 'User';`
-
-**Required Fix**:
-- Verify backend `/users/me` endpoint returns `full_name` field
+curl http://localhost:10000/v3/analysis?symbol=BTCUSDT&timeframe=5m
+curl http://localhost:10000/v3/scheduler/status
+curl http://localhost:10000/v3/dashboard
+curl http://localhost:10000/v3/strategies
 - Check if response structure matches expected format
 - May need to update field mapping in AccountModel
 

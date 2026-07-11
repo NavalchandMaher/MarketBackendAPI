@@ -1,6 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from pydantic import BaseModel, Field
 from typing import Any, Dict, Optional
+import uuid
+from datetime import datetime
+
+from db.mongodb import backtest_results, notifications
 
 from services.v3_service import V3Service
 from services.auth_service import AuthService
@@ -99,9 +103,62 @@ def delete_strategy(strategy_id: str, user=Depends(AuthService.get_current_user)
 
 @router.post("/backtest/run")
 def run_backtest(payload: BacktestPayload, user=Depends(AuthService.get_current_user)):
+    """Synchronous backtest run (blocking) - kept for compatibility."""
     data = payload.model_dump(exclude_none=True)
     data["user_id"] = str(user["_id"])
-    return V3Service.run_backtest(data)
+    result = V3Service.run_backtest(data)
+    return result
+
+
+async def _run_backtest_background(data: Dict[str, Any], backtest_id: str, user_id: str):
+    """Background task: run the backtest and update the DB and notifications."""
+    try:
+        # Delegate to the existing service (blocking) inside threadpool
+        import asyncio
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(None, V3Service.run_backtest, data, user_id)
+
+        # Update the backtest record with result and completed status
+        backtest_results.update_one({"backtest_id": backtest_id}, {"$set": {"result": result.get("result"), "status": "completed", "updated_at": datetime.utcnow(), "backtest_response": result}})
+
+        # Insert a notification for the user
+        try:
+            notifications.insert_one({"user_id": user_id, "type": "backtest_completed", "backtest_id": backtest_id, "created_at": datetime.utcnow(), "read": False})
+        except Exception:
+            # best-effort: do not crash background worker on notification failure
+            pass
+    except Exception:
+        backtest_results.update_one({"backtest_id": backtest_id}, {"$set": {"status": "failed", "updated_at": datetime.utcnow()}})
+
+
+@router.post("/backtest/async")
+def run_backtest_async(payload: BacktestPayload, background_tasks: BackgroundTasks, user=Depends(AuthService.get_current_user)):
+    """Start a backtest asynchronously and return immediately with a backtest_id."""
+    data = payload.model_dump(exclude_none=True)
+    user_id = str(user["_id"]) if user else None
+    backtest_id = str(uuid.uuid4())
+
+    # Insert a running record so clients can poll status
+    record = {
+        "backtest_id": backtest_id,
+        "user_id": user_id,
+        "symbol": data.get("symbol", "BTCUSDT"),
+        "timeframe": data.get("timeframe", "5m"),
+        "days": data.get("days", 365),
+        "status": "running",
+        "created_at": datetime.utcnow(),
+        "updated_at": datetime.utcnow(),
+    }
+    try:
+        backtest_results.insert_one(record)
+    except Exception:
+        # If DB insert fails, return an error
+        raise HTTPException(status_code=500, detail="Failed to create backtest record")
+
+    # Schedule background runner
+    background_tasks.add_task(_run_backtest_background, data, backtest_id, user_id)
+
+    return {"success": True, "backtest_id": backtest_id, "status": "started"}
 
 
 @router.get("/backtest/history")

@@ -11,7 +11,7 @@ This is a quick reference guide with curl examples and common implementation pat
 Add these to your development environment:
 
 ```
-API_BASE_URL=http://localhost:8000
+API_BASE_URL=http://localhost:10000
 ACCESS_TOKEN=<jwt_access_token>
 REFRESH_TOKEN=<jwt_refresh_token>
 ```
@@ -23,7 +23,7 @@ REFRESH_TOKEN=<jwt_refresh_token>
 ### 1. User Registration
 
 ```bash
-curl -X POST http://localhost:8000/auth/register \
+curl -X POST http://localhost:10000/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "full_name": "John Doe",
@@ -48,7 +48,7 @@ curl -X POST http://localhost:8000/auth/register \
 ### 2. User Login
 
 ```bash
-curl -X POST http://localhost:8000/auth/login \
+curl -X POST http://localhost:10000/auth/login \
   -H "Content-Type: application/json" \
   -d '{
     "email": "john@example.com",
@@ -76,7 +76,7 @@ curl -X POST http://localhost:8000/auth/login \
 ### 3. Get Current User Profile
 
 ```bash
-curl -X GET http://localhost:8000/users/me \
+curl -X GET http://localhost:10000/users/me \
   -H "Authorization: Bearer <ACCESS_TOKEN>"
 ```
 
@@ -85,7 +85,7 @@ curl -X GET http://localhost:8000/users/me \
 ### 4. Get Dashboard
 
 ```bash
-curl -X GET http://localhost:8000/v3/dashboard \
+curl -X GET http://localhost:10000/v3/dashboard \
   -H "Authorization: Bearer <ACCESS_TOKEN>"
 ```
 
@@ -94,7 +94,7 @@ curl -X GET http://localhost:8000/v3/dashboard \
 ### 5. List Strategies
 
 ```bash
-curl -X GET http://localhost:8000/v3/strategies \
+curl -X GET http://localhost:10000/v3/strategies \
   -H "Authorization: Bearer <ACCESS_TOKEN>"
 ```
 
@@ -103,7 +103,7 @@ curl -X GET http://localhost:8000/v3/strategies \
 ### 6. Get Market Analysis
 
 ```bash
-curl -X GET "http://localhost:8000/analysis?symbol=BTCUSDT&timeframe=5m"
+curl -X GET "http://localhost:10000/analysis?symbol=BTCUSDT&timeframe=5m"
 ```
 
 ---
@@ -117,7 +117,7 @@ curl -X GET "http://localhost:8000/analysis?symbol=BTCUSDT&timeframe=5m"
 Future<Map<String, dynamic>> fetchDashboard(String accessToken) async {
   try {
     final response = await http.get(
-      Uri.parse('http://localhost:8000/v3/dashboard'),
+      Uri.parse('http://localhost:10000/v3/dashboard'),
       headers: {
         'Authorization': 'Bearer $accessToken',
         'Content-Type': 'application/json',
@@ -153,7 +153,7 @@ Future<String> getValidAccessToken(String accessToken, String refreshToken) asyn
   if (DateTime.now().isAfter(expiryDate.subtract(Duration(minutes: 5)))) {
     // Token expires in less than 5 minutes, refresh it
     final response = await http.post(
-      Uri.parse('http://localhost:8000/auth/refresh'),
+      Uri.parse('http://localhost:10000/auth/refresh'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'refresh_token': refreshToken}),
     );
@@ -189,7 +189,7 @@ class ApiState {
 
     try {
       final response = await http.get(
-        Uri.parse('http://localhost:8000$endpoint'),
+        Uri.parse('http://localhost:10000$endpoint'),
         headers: {'Authorization': 'Bearer $token'},
       );
 
@@ -353,7 +353,7 @@ Future<List<dynamic>> getStrategies(int page) async {
   final offset = (page - 1) * limit;
   
   final response = await http.get(
-    Uri.parse('http://localhost:8000/v3/strategies?limit=$limit&offset=$offset'),
+    Uri.parse('http://localhost:10000/v3/strategies?limit=$limit&offset=$offset'),
     headers: {'Authorization': 'Bearer $token'},
   );
   
@@ -368,11 +368,11 @@ Future<List<dynamic>> getStrategies(int page) async {
 ```dart
 Future<Map<String, dynamic>> fetchDashboardData(String token) async {
   final results = await Future.wait([
-    http.get(Uri.parse('http://localhost:8000/v3/dashboard'), 
+    http.get(Uri.parse('http://localhost:10000/v3/dashboard'),
       headers: {'Authorization': 'Bearer $token'}),
-    http.get(Uri.parse('http://localhost:8000/v3/paper/open'), 
+    http.get(Uri.parse('http://localhost:10000/v3/paper/open'),
       headers: {'Authorization': 'Bearer $token'}),
-    http.get(Uri.parse('http://localhost:8000/v3/strategies'), 
+    http.get(Uri.parse('http://localhost:10000/v3/strategies'),
       headers: {'Authorization': 'Bearer $token'}),
   ]);
   

@@ -3,7 +3,7 @@
     "name": "Market AI V3 - Backend API",
     "version": "3.0.0",
     "description": "Complete API documentation for Market AI Trading Platform V3",
-    "baseUrl": "http://localhost:8000",
+    "baseUrl": "http://localhost:10000",
     "baseUrlProduction": "https://your-production-api.com",
     "authentication": "Bearer Token (JWT)",
     "lastUpdated": "2026-07-09"
