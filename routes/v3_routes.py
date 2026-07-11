@@ -174,6 +174,14 @@ def get_backtest(backtest_id: str, user=Depends(AuthService.get_current_user)):
     return backtest
 
 
+@router.get("/backtest/{backtest_id}/status")
+def backtest_status(backtest_id: str, user=Depends(AuthService.get_current_user)):
+    doc = backtest_results.find_one({"backtest_id": backtest_id, "user_id": str(user["_id"])})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Backtest not found")
+    return {"backtest_id": backtest_id, "status": doc.get("status", "unknown"), "created_at": doc.get("created_at"), "updated_at": doc.get("updated_at")}
+
+
 @router.delete("/backtest/{backtest_id}")
 def delete_backtest(backtest_id: str, user=Depends(AuthService.get_current_user)):
     return V3Service.delete_backtest(backtest_id, user_id=str(user["_id"]))
