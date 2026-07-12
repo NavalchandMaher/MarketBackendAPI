@@ -209,8 +209,9 @@ def run_backtest_async(
 
 
 @router.get("/backtest/history")
-def list_backtests(user=Depends(AuthService.get_current_user)):
-    return V3Service.list_backtests(user_id=str(user["_id"]))
+def list_backtests(user=Depends(AuthService.get_optional_current_user)):
+    user_id = str(user["_id"]) if user else None
+    return V3Service.list_backtests(user_id=user_id)
 
 
 @router.get("/backtest/{backtest_id}")

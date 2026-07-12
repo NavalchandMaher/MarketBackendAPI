@@ -181,7 +181,12 @@ class V3Service:
 
     @staticmethod
     def list_backtests(user_id: Optional[str] = None) -> List[Dict[str, Any]]:
-        docs = list(backtest_results.find(V3Service._build_user_scope(user_id)).sort("created_at", -1))
+        # Return user-specific backtests plus global (user_id == None), or all if no user_id provided
+        if user_id:
+            query = {"$or": [{"user_id": user_id}, {"user_id": None}]}
+        else:
+            query = {}
+        docs = list(backtest_results.find(query).sort("created_at", -1))
         return [V3Service._jsonify_document(doc) for doc in docs]
 
     @staticmethod
