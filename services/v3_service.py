@@ -123,24 +123,51 @@ class V3Service:
         return {"success": result.deleted_count > 0, "deleted": result.deleted_count > 0}
 
     @staticmethod
-    def run_backtest(payload: Dict[str, Any], user_id: Optional[str] = None) -> Dict[str, Any]:
+    def run_backtest(
+        payload: Dict[str, Any],
+        user_id: Optional[str] = None,
+        backtest_id: Optional[str] = None,
+        create_record: bool = True,
+    ) -> Dict[str, Any]:
+        if payload.get("start_date") and payload.get("end_date"):
+            try:
+                start = datetime.fromisoformat(payload["start_date"])
+                end = datetime.fromisoformat(payload["end_date"])
+                payload["days"] = max(1, (end - start).days)
+            except Exception:
+                pass
+
         report = BackTester.run(
             symbol=payload.get("symbol", "BTCUSDT"),
             timeframe=payload.get("timeframe", "5m"),
             days=payload.get("days", 365),
         )
-        backtest_id = str(uuid.uuid4())
-        payload_doc = {
-            "user_id": user_id or payload.get("user_id"),
-            "backtest_id": backtest_id,
-            "symbol": payload.get("symbol", "BTCUSDT"),
-            "timeframe": payload.get("timeframe", "5m"),
-            "days": payload.get("days", 365),
-            "result": report,
-            "created_at": datetime.utcnow(),
-        }
-        backtest_results.insert_one(payload_doc)
-        return {"success": True, "backtest_id": backtest_id, "result": report}
+
+        if create_record:
+            backtest_id = backtest_id or str(uuid.uuid4())
+            payload_doc = {
+                "user_id": user_id or payload.get("user_id"),
+                "backtest_id": backtest_id,
+                "strategy_name": payload.get("strategy_name"),
+                "symbol": payload.get("symbol", "BTCUSDT"),
+                "timeframe": payload.get("timeframe", "5m"),
+                "days": payload.get("days", 365),
+                "start_date": payload.get("start_date"),
+                "end_date": payload.get("end_date"),
+                "initial_capital": payload.get("initial_capital", 100000.0),
+                "commission": payload.get("commission", 0.0),
+                "slippage": payload.get("slippage", 0.0),
+                "date_range": payload.get("date_range"),
+                "result": report,
+                "status": payload.get("status", "completed"),
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow(),
+            }
+            backtest_results.insert_one(payload_doc)
+            return {"success": True, "backtest_id": backtest_id, "result": report}
+
+        # If record already exists, just return report and let caller update the record
+        return {"success": True, "backtest_id": backtest_id or str(uuid.uuid4()), "result": report}
 
     @staticmethod
     def get_backtest(backtest_id: str, user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:

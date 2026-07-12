@@ -30,9 +30,16 @@ class StrategyPayload(BaseModel):
 
 
 class BacktestPayload(BaseModel):
+    strategy_name: Optional[str] = None
     symbol: Optional[str] = "BTCUSDT"
     timeframe: Optional[str] = "5m"
     days: Optional[int] = 365
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    initial_capital: Optional[float] = 100000.0
+    commission: Optional[float] = 0.0
+    slippage: Optional[float] = 0.0
+    date_range: Optional[Dict[str, str]] = None
 
 
 class BrokerPayload(BaseModel):
@@ -116,19 +123,40 @@ async def _run_backtest_background(data: Dict[str, Any], backtest_id: str, user_
         # Delegate to the existing service (blocking) inside threadpool
         import asyncio
         loop = asyncio.get_running_loop()
-        result = await loop.run_in_executor(None, V3Service.run_backtest, data, user_id)
+        result = await loop.run_in_executor(None, V3Service.run_backtest, data, user_id, backtest_id, False)
 
         # Update the backtest record with result and completed status
-        backtest_results.update_one({"backtest_id": backtest_id}, {"$set": {"result": result.get("result"), "status": "completed", "updated_at": datetime.utcnow(), "backtest_response": result}})
+        backtest_results.update_one(
+            {"backtest_id": backtest_id},
+            {
+                "$set": {
+                    "result": result.get("result"),
+                    "status": "completed",
+                    "updated_at": datetime.utcnow(),
+                    "backtest_response": result,
+                }
+            },
+        )
 
         # Insert a notification for the user
         try:
-            notifications.insert_one({"user_id": user_id, "type": "backtest_completed", "backtest_id": backtest_id, "created_at": datetime.utcnow(), "read": False})
+            notifications.insert_one(
+                {
+                    "user_id": user_id,
+                    "type": "backtest_completed",
+                    "backtest_id": backtest_id,
+                    "created_at": datetime.utcnow(),
+                    "read": False,
+                }
+            )
         except Exception:
             # best-effort: do not crash background worker on notification failure
             pass
     except Exception:
-        backtest_results.update_one({"backtest_id": backtest_id}, {"$set": {"status": "failed", "updated_at": datetime.utcnow()}})
+        backtest_results.update_one(
+            {"backtest_id": backtest_id},
+            {"$set": {"status": "failed", "updated_at": datetime.utcnow()}},
+        )
 
 
 @router.post("/backtest/async")
@@ -142,9 +170,16 @@ def run_backtest_async(payload: BacktestPayload, background_tasks: BackgroundTas
     record = {
         "backtest_id": backtest_id,
         "user_id": user_id,
+        "strategy_name": data.get("strategy_name"),
         "symbol": data.get("symbol", "BTCUSDT"),
         "timeframe": data.get("timeframe", "5m"),
         "days": data.get("days", 365),
+        "start_date": data.get("start_date"),
+        "end_date": data.get("end_date"),
+        "initial_capital": data.get("initial_capital", 100000.0),
+        "commission": data.get("commission", 0.0),
+        "slippage": data.get("slippage", 0.0),
+        "date_range": data.get("date_range"),
         "status": "running",
         "created_at": datetime.utcnow(),
         "updated_at": datetime.utcnow(),
