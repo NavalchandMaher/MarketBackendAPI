@@ -137,11 +137,14 @@ class V3Service:
             except Exception:
                 pass
 
-        report = BackTester.run(
-            symbol=payload.get("symbol", "BTCUSDT"),
-            timeframe=payload.get("timeframe", "5m"),
-            days=payload.get("days", 365),
-        )
+        try:
+            report = BackTester.run(
+                symbol=payload.get("symbol", "BTCUSDT"),
+                timeframe=payload.get("timeframe", "5m"),
+                days=payload.get("days", 365),
+            )
+        except Exception as exc:
+            raise RuntimeError(f"BackTester.run failed: {exc}") from exc
 
         if create_record:
             backtest_id = backtest_id or str(uuid.uuid4())
@@ -166,7 +169,6 @@ class V3Service:
             backtest_results.insert_one(payload_doc)
             return {"success": True, "backtest_id": backtest_id, "result": report}
 
-        # If record already exists, just return report and let caller update the record
         return {"success": True, "backtest_id": backtest_id or str(uuid.uuid4()), "result": report}
 
     @staticmethod

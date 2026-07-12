@@ -164,49 +164,53 @@ class BackTester:
 
     @staticmethod
     def execute_strategy(history, strategy):
+        try:
+            candle = history.iloc[-1]
 
-        candle = history.iloc[-1]
+            score = 0
 
-        score = 0
+            # EMA
+            if candle.get("ema20", 0) > candle.get("ema50", 0):
+                score += 2
+            else:
+                score -= 2
 
-        # EMA
-        if candle["ema20"] > candle["ema50"]:
-            score += 2
-        else:
-            score -= 2
+            # RSI
+            rsi_buy = strategy.get("rsi_buy", 35)
+            rsi_sell = strategy.get("rsi_sell", 70)
 
-        # RSI
+            if candle.get("rsi", 0) < rsi_buy:
+                score += 2
+            elif candle.get("rsi", 0) > rsi_sell:
+                score -= 2
 
-        rsi_buy = strategy.get("rsi_buy", 35)
-        rsi_sell = strategy.get("rsi_sell", 70)
+            # MACD
+            if candle.get("macd", 0) > candle.get("macd_signal", 0):
+                score += 1
+            else:
+                score -= 1
 
-        if candle["rsi"] < rsi_buy:
-            score += 2
+            # ADX
+            if candle.get("adx", 0) > 25:
+                score += 1
 
-        elif candle["rsi"] > rsi_sell:
-            score -= 2
+            # SuperTrend
+            if candle.get("supertrend_direction", "BULLISH") == "BULLISH":
+                score += 1
+            else:
+                score -= 1
 
-        # MACD
-        if candle["macd"] > candle["macd_signal"]:
-            score += 1
-        else:
-            score -= 1
+            buy_threshold = strategy.get("buy_threshold", 3)
+            sell_threshold = strategy.get("sell_threshold", -3)
 
-        # ADX
-        if candle["adx"] > 25:
-            score += 1
+            if score >= buy_threshold:
+                return "BUY"
 
-        # SuperTrend
-        if candle["supertrend_direction"] == "BULLISH":
-            score += 1
-        else:
-            score -= 1
-
-        if score >= strategy["buy_threshold"]:
-            return "BUY"
-
-        if score <= strategy["sell_threshold"]:
-            return "SELL"
+            if score <= sell_threshold:
+                return "SELL"
+        except Exception:
+            # If indicator data is missing or malformed, skip this step
+            return "WAIT"
 
         return "WAIT"
 

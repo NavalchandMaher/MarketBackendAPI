@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 from typing import Any, Dict, Optional
 import uuid
 from datetime import datetime
+import traceback
 
 from db.mongodb import backtest_results, notifications
 
@@ -152,15 +153,28 @@ async def _run_backtest_background(data: Dict[str, Any], backtest_id: str, user_
         except Exception:
             # best-effort: do not crash background worker on notification failure
             pass
-    except Exception:
+    except Exception as exc:
+        error_message = str(exc)
+        stack_trace = traceback.format_exc()
         backtest_results.update_one(
             {"backtest_id": backtest_id},
-            {"$set": {"status": "failed", "updated_at": datetime.utcnow()}},
+            {
+                "$set": {
+                    "status": "failed",
+                    "updated_at": datetime.utcnow(),
+                    "error_message": error_message,
+                    "error_trace": stack_trace,
+                }
+            },
         )
 
 
 @router.post("/backtest/async")
-def run_backtest_async(payload: BacktestPayload, background_tasks: BackgroundTasks, user=Depends(AuthService.get_current_user)):
+def run_backtest_async(
+    payload: BacktestPayload,
+    background_tasks: BackgroundTasks,
+    user=Depends(AuthService.get_optional_current_user),
+):
     """Start a backtest asynchronously and return immediately with a backtest_id."""
     data = payload.model_dump(exclude_none=True)
     user_id = str(user["_id"]) if user else None
@@ -187,10 +201,8 @@ def run_backtest_async(payload: BacktestPayload, background_tasks: BackgroundTas
     try:
         backtest_results.insert_one(record)
     except Exception:
-        # If DB insert fails, return an error
         raise HTTPException(status_code=500, detail="Failed to create backtest record")
 
-    # Schedule background runner
     background_tasks.add_task(_run_backtest_background, data, backtest_id, user_id)
 
     return {"success": True, "backtest_id": backtest_id, "status": "started"}
@@ -202,19 +214,28 @@ def list_backtests(user=Depends(AuthService.get_current_user)):
 
 
 @router.get("/backtest/{backtest_id}")
-def get_backtest(backtest_id: str, user=Depends(AuthService.get_current_user)):
-    backtest = V3Service.get_backtest(backtest_id, user_id=str(user["_id"]))
+def get_backtest(strategy_id: str, user=Depends(AuthService.get_current_user)):
+    backtest = V3Service.get_backtest(strategy_id, user_id=str(user["_id"]))
     if not backtest:
         raise HTTPException(status_code=404, detail="Backtest not found")
     return backtest
 
 
 @router.get("/backtest/{backtest_id}/status")
-def backtest_status(backtest_id: str, user=Depends(AuthService.get_current_user)):
-    doc = backtest_results.find_one({"backtest_id": backtest_id, "user_id": str(user["_id"])})
+def backtest_status(backtest_id: str, user=Depends(AuthService.get_optional_current_user)):
+    query = {"backtest_id": backtest_id}
+    if user:
+        query["user_id"] = str(user["_id"])
+
+    doc = backtest_results.find_one(query)
     if not doc:
         raise HTTPException(status_code=404, detail="Backtest not found")
-    return {"backtest_id": backtest_id, "status": doc.get("status", "unknown"), "created_at": doc.get("created_at"), "updated_at": doc.get("updated_at")}
+    return {
+        "backtest_id": backtest_id,
+        "status": doc.get("status", "unknown"),
+        "created_at": doc.get("created_at"),
+        "updated_at": doc.get("updated_at"),
+    }
 
 
 @router.delete("/backtest/{backtest_id}")
