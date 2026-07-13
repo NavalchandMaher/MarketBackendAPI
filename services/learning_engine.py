@@ -549,6 +549,7 @@ class LearningEngine:
 
         strategy["created_at"] = datetime.utcnow()
 
+        # Preserve optional user scoping if present on the strategy dict
         strategies.insert_one(strategy)
 
         return strategy
@@ -620,6 +621,9 @@ class LearningEngine:
             "created_at": datetime.utcnow(),
         }
 
+        # If the strategy has a user_id, propagate it to the learning log
+        if strategy.get("user_id"):
+            log["user_id"] = strategy.get("user_id")
         learning_logs.insert_one(log)
 
     # ==========================================================

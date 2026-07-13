@@ -553,6 +553,10 @@ class BackTester:
 
         report["created_at"] = datetime.utcnow()
 
+        # Preserve any provided user scoping; if not present, explicitly set to None
+        if "user_id" not in report:
+            report["user_id"] = None
+
         result = backtest_results.insert_one(report)
 
         report["_id"] = str(result.inserted_id)
@@ -564,11 +568,14 @@ class BackTester:
     # =====================================================
 
     @staticmethod
-    def save_all(results):
+    def save_all(results, user_id: str | None = None):
 
         saved = []
 
         for report in results:
+
+            if user_id:
+                report["user_id"] = user_id
 
             saved.append(BackTester.save_report(report))
 
@@ -579,13 +586,15 @@ class BackTester:
     # =====================================================
 
     @staticmethod
-    def dashboard(symbol="BTCUSDT", timeframe="5m", days=365):
+
+    def dashboard(symbol="BTCUSDT", timeframe="5m", days=365, user_id: str | None = None):
 
         reports = BackTester.run_all(symbol, timeframe, days)
 
         best = BackTester.best_strategy(reports)
 
-        BackTester.save_all(reports)
+        # Save reports; attach user_id when provided
+        BackTester.save_all(reports, user_id=user_id)
 
         return {
             "symbol": symbol,
@@ -601,9 +610,9 @@ class BackTester:
     # =====================================================
 
     @staticmethod
-    def run(symbol="BTCUSDT", timeframe="5m", days=365):
+    def run(symbol="BTCUSDT", timeframe="5m", days=365, user_id: str | None = None):
 
-        dashboard = BackTester.dashboard(symbol, timeframe, days)
+        dashboard = BackTester.dashboard(symbol, timeframe, days, user_id=user_id)
 
         return {
             "success": True,

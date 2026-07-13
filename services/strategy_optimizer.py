@@ -231,7 +231,7 @@ class StrategyOptimizer:
     # =====================================================
 
     @staticmethod
-    def enable_best_strategy():
+    def enable_best_strategy(user_id: str | None = None):
 
         best = StrategyOptimizer.best_strategy()
 
@@ -246,16 +246,17 @@ class StrategyOptimizer:
             {"$set": {"enabled": True, "updated_at": datetime.utcnow()}},
         )
 
-        learning_logs.insert_one(
-            {
-                "event": "BEST_STRATEGY_ENABLED",
-                "strategy": best["strategy"],
-                "version": best["version"],
-                "win_rate": best["win_rate"],
-                "profit": best["profit"],
-                "created_at": datetime.utcnow(),
-            }
-        )
+        log_doc = {
+            "event": "BEST_STRATEGY_ENABLED",
+            "strategy": best["strategy"],
+            "version": best["version"],
+            "win_rate": best["win_rate"],
+            "profit": best["profit"],
+            "created_at": datetime.utcnow(),
+        }
+        if user_id:
+            log_doc["user_id"] = user_id
+        learning_logs.insert_one(log_doc)
 
         return best
 
@@ -347,7 +348,7 @@ class StrategyOptimizer:
     # =====================================================
 
     @staticmethod
-    def save_new_version():
+    def save_new_version(user_id: str | None = None):
 
         strategy = StrategyOptimizer.generate_strategy()
 
@@ -355,18 +356,22 @@ class StrategyOptimizer:
 
             return None
 
+        # Preserve user ownership if provided
+        if user_id:
+            strategy["user_id"] = user_id
         result = strategies.insert_one(strategy)
 
         strategy["_id"] = str(result.inserted_id)
 
-        learning_logs.insert_one(
-            {
-                "event": "NEW_STRATEGY_CREATED",
-                "strategy": strategy["strategy_name"],
-                "version": strategy["version"],
-                "created_at": datetime.utcnow(),
-            }
-        )
+        log_doc = {
+            "event": "NEW_STRATEGY_CREATED",
+            "strategy": strategy["strategy_name"],
+            "version": strategy["version"],
+            "created_at": datetime.utcnow(),
+        }
+        if user_id:
+            log_doc["user_id"] = user_id
+        learning_logs.insert_one(log_doc)
 
         return strategy
 

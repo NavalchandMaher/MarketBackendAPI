@@ -256,7 +256,7 @@ class SchedulerService:
     # =====================================================
 
     @staticmethod
-    def status():
+    def status(user_id=None):
 
         jobs = []
 
@@ -281,8 +281,10 @@ class SchedulerService:
     # =====================================================
 
     @staticmethod
-    def run_market_now():
+    def run_market_now(user_id=None):
 
+        # User-scoped execution is currently a no-op for market-level jobs;
+        # keep signature for compatibility with authenticated routes.
         SchedulerService.market_cycle()
 
         return {"success": True, "message": "Market cycle executed."}
@@ -292,8 +294,9 @@ class SchedulerService:
     # =====================================================
 
     @staticmethod
-    def run_nightly_now():
+    def run_nightly_now(user_id=None):
 
+        # Nightly cycle may operate globally; keep user_id for future scoping
         return SchedulerService.nightly_cycle()
 
         # =====================================================
@@ -302,7 +305,7 @@ class SchedulerService:
     # =====================================================
 
     @staticmethod
-    def dashboard():
+    def dashboard(user_id=None):
 
         return {
             "scheduler": SchedulerService.status(),

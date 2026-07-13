@@ -72,7 +72,8 @@ def dashboard(user=Depends(AuthService.get_current_user)):
 
 
 @router.get("/analysis")
-def analysis(symbol: str = Query("BTCUSDT"), timeframe: str = Query("5m")):
+def analysis(symbol: str = Query("BTCUSDT"), timeframe: str = Query("5m"), user=Depends(AuthService.get_current_user)):
+    """Market analysis endpoint - requires authentication"""
     return analyze_market(symbol, timeframe)
 
 
@@ -120,7 +121,14 @@ def run_backtest(payload: BacktestPayload, user=Depends(AuthService.get_current_
 
 async def _run_backtest_background(data: Dict[str, Any], backtest_id: str, user_id: str):
     """Background task: run the backtest and update the DB and notifications."""
+    from bson.objectid import ObjectId
     try:
+        # Convert backtest_id to ObjectId for database operations
+        try:
+            object_id = ObjectId(backtest_id)
+        except Exception:
+            object_id = backtest_id
+
         # Delegate to the existing service (blocking) inside threadpool
         import asyncio
         loop = asyncio.get_running_loop()
@@ -128,7 +136,7 @@ async def _run_backtest_background(data: Dict[str, Any], backtest_id: str, user_
 
         # Update the backtest record with result and completed status
         backtest_results.update_one(
-            {"backtest_id": backtest_id},
+            {"_id": object_id, "user_id": user_id},
             {
                 "$set": {
                     "result": result.get("result"),
@@ -156,8 +164,12 @@ async def _run_backtest_background(data: Dict[str, Any], backtest_id: str, user_
     except Exception as exc:
         error_message = str(exc)
         stack_trace = traceback.format_exc()
+        try:
+            object_id = ObjectId(backtest_id)
+        except Exception:
+            object_id = backtest_id
         backtest_results.update_one(
-            {"backtest_id": backtest_id},
+            {"_id": object_id, "user_id": user_id},
             {
                 "$set": {
                     "status": "failed",
@@ -173,16 +185,14 @@ async def _run_backtest_background(data: Dict[str, Any], backtest_id: str, user_
 def run_backtest_async(
     payload: BacktestPayload,
     background_tasks: BackgroundTasks,
-    user=Depends(AuthService.get_optional_current_user),
+    user=Depends(AuthService.get_current_user),
 ):
     """Start a backtest asynchronously and return immediately with a backtest_id."""
     data = payload.model_dump(exclude_none=True)
-    user_id = str(user["_id"]) if user else None
-    backtest_id = str(uuid.uuid4())
+    user_id = str(user["_id"])
 
     # Insert a running record so clients can poll status
     record = {
-        "backtest_id": backtest_id,
         "user_id": user_id,
         "strategy_name": data.get("strategy_name"),
         "symbol": data.get("symbol", "BTCUSDT"),
@@ -199,7 +209,8 @@ def run_backtest_async(
         "updated_at": datetime.utcnow(),
     }
     try:
-        backtest_results.insert_one(record)
+        result = backtest_results.insert_one(record)
+        backtest_id = str(result.inserted_id)
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to create backtest record")
 
@@ -209,8 +220,8 @@ def run_backtest_async(
 
 
 @router.get("/backtest/history")
-def list_backtests(user=Depends(AuthService.get_optional_current_user)):
-    user_id = str(user["_id"]) if user else None
+def list_backtests(user=Depends(AuthService.get_current_user)):
+    user_id = str(user["_id"])
     return V3Service.list_backtests(user_id=user_id)
 
 
@@ -223,16 +234,19 @@ def get_backtest(strategy_id: str, user=Depends(AuthService.get_current_user)):
 
 
 @router.get("/backtest/{backtest_id}/status")
-def backtest_status(backtest_id: str, user=Depends(AuthService.get_optional_current_user)):
-    query = {"backtest_id": backtest_id}
-    if user:
-        query["user_id"] = str(user["_id"])
-
+def backtest_status(backtest_id: str, user=Depends(AuthService.get_current_user)):
+    from bson.objectid import ObjectId
+    try:
+        object_id = ObjectId(backtest_id)
+    except Exception:
+        object_id = backtest_id
+    
+    query = {"_id": object_id, "user_id": str(user["_id"])}
     doc = backtest_results.find_one(query)
     if not doc:
         raise HTTPException(status_code=404, detail="Backtest not found")
     return {
-        "backtest_id": backtest_id,
+        "backtest_id": str(doc["_id"]),
         "status": doc.get("status", "unknown"),
         "created_at": doc.get("created_at"),
         "updated_at": doc.get("updated_at"),
@@ -280,18 +294,27 @@ def brokers():
 
 
 @router.post("/broker/connect")
-def broker_connect(payload: BrokerPayload):
-    return V3Service.broker_connect(payload.model_dump(exclude_none=True))
+def broker_connect(payload: BrokerPayload, user=Depends(AuthService.get_current_user)):
+    """Connect broker credentials for current user"""
+    data = payload.model_dump(exclude_none=True)
+    data["user_id"] = str(user["_id"])
+    return V3Service.broker_connect(data)
 
 
 @router.post("/broker/test")
-def broker_test(payload: BrokerPayload):
-    return V3Service.broker_test(payload.model_dump(exclude_none=True))
+def broker_test(payload: BrokerPayload, user=Depends(AuthService.get_current_user)):
+    """Test broker connection for current user"""
+    data = payload.model_dump(exclude_none=True)
+    data["user_id"] = str(user["_id"])
+    return V3Service.broker_test(data)
 
 
 @router.post("/broker/disconnect")
-def broker_disconnect(payload: BrokerPayload):
-    return V3Service.broker_disconnect(payload.model_dump(exclude_none=True))
+def broker_disconnect(payload: BrokerPayload, user=Depends(AuthService.get_current_user)):
+    """Disconnect broker for current user"""
+    data = payload.model_dump(exclude_none=True)
+    data["user_id"] = str(user["_id"])
+    return V3Service.broker_disconnect(data)
 
 
 @router.get("/reports/dashboard")
@@ -335,38 +358,52 @@ def learning_latest(user=Depends(AuthService.get_current_user)):
 
 
 @router.get("/scheduler/jobs")
-def scheduler_jobs():
-    return V3Service.scheduler_jobs()
+def scheduler_jobs(user=Depends(AuthService.get_current_user)):
+    """Get user-specific scheduler jobs"""
+    user_id = str(user["_id"])
+    return V3Service.scheduler_jobs(user_id=user_id)
 
 
 @router.get("/scheduler/status")
-def scheduler_status():
-    return SchedulerService.status()
+def scheduler_status(user=Depends(AuthService.get_current_user)):
+    """Get scheduler status for current user"""
+    user_id = str(user["_id"])
+    return SchedulerService.status(user_id=user_id)
 
 
 @router.get("/scheduler/dashboard")
-def scheduler_dashboard():
-    return SchedulerService.dashboard()
+def scheduler_dashboard(user=Depends(AuthService.get_current_user)):
+    """Get scheduler dashboard for current user"""
+    user_id = str(user["_id"])
+    return SchedulerService.dashboard(user_id=user_id)
 
 
 @router.post("/scheduler/start")
-def scheduler_start():
-    return {"success": True, "message": "Scheduler start requested."}
+def scheduler_start(user=Depends(AuthService.get_current_user)):
+    """Start scheduler for current user"""
+    user_id = str(user["_id"])
+    return {"success": True, "message": "Scheduler start requested.", "user_id": user_id}
 
 
 @router.post("/scheduler/stop")
-def scheduler_stop():
-    return {"success": True, "message": "Scheduler stop requested."}
+def scheduler_stop(user=Depends(AuthService.get_current_user)):
+    """Stop scheduler for current user"""
+    user_id = str(user["_id"])
+    return {"success": True, "message": "Scheduler stop requested.", "user_id": user_id}
 
 
 @router.post("/scheduler/run-market")
-def run_market():
-    return SchedulerService.run_market_now()
+def run_market(user=Depends(AuthService.get_current_user)):
+    """Manually run market scanner for current user"""
+    user_id = str(user["_id"])
+    return SchedulerService.run_market_now(user_id=user_id)
 
 
 @router.post("/scheduler/run-nightly")
-def run_nightly():
-    return SchedulerService.run_nightly_now()
+def run_nightly(user=Depends(AuthService.get_current_user)):
+    """Manually run nightly optimization for current user"""
+    user_id = str(user["_id"])
+    return SchedulerService.run_nightly_now(user_id=user_id)
 
 
 @router.get("/settings")

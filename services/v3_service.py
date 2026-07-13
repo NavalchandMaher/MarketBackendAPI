@@ -142,15 +142,14 @@ class V3Service:
                 symbol=payload.get("symbol", "BTCUSDT"),
                 timeframe=payload.get("timeframe", "5m"),
                 days=payload.get("days", 365),
+                user_id=user_id,
             )
         except Exception as exc:
             raise RuntimeError(f"BackTester.run failed: {exc}") from exc
 
         if create_record:
-            backtest_id = backtest_id or str(uuid.uuid4())
             payload_doc = {
                 "user_id": user_id or payload.get("user_id"),
-                "backtest_id": backtest_id,
                 "strategy_name": payload.get("strategy_name"),
                 "symbol": payload.get("symbol", "BTCUSDT"),
                 "timeframe": payload.get("timeframe", "5m"),
@@ -166,32 +165,38 @@ class V3Service:
                 "created_at": datetime.utcnow(),
                 "updated_at": datetime.utcnow(),
             }
-            backtest_results.insert_one(payload_doc)
-            return {"success": True, "backtest_id": backtest_id, "result": report}
+            result = backtest_results.insert_one(payload_doc)
+            inserted_id = str(result.inserted_id)
+            return {"success": True, "backtest_id": inserted_id, "result": report}
 
-        return {"success": True, "backtest_id": backtest_id or str(uuid.uuid4()), "result": report}
+        return {"success": True, "backtest_id": str(uuid.uuid4()), "result": report}
 
     @staticmethod
     def get_backtest(backtest_id: str, user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
-        doc = backtest_results.find_one({"backtest_id": backtest_id, **V3Service._build_user_scope(user_id)})
-        if doc:
-            doc = dict(doc)
-            doc["id"] = str(doc.pop("_id"))
-        return doc
+        from bson.objectid import ObjectId
+        try:
+            object_id = ObjectId(backtest_id)
+        except Exception:
+            object_id = backtest_id
+        query = {"_id": object_id, **V3Service._build_user_scope(user_id)}
+        doc = backtest_results.find_one(query)
+        return V3Service._jsonify_document(doc)
 
     @staticmethod
     def list_backtests(user_id: Optional[str] = None) -> List[Dict[str, Any]]:
-        # Return user-specific backtests plus global (user_id == None), or all if no user_id provided
-        if user_id:
-            query = {"$or": [{"user_id": user_id}, {"user_id": None}]}
-        else:
-            query = {}
+        # Return only user-specific backtests; do not include system backtests
+        query = V3Service._build_user_scope(user_id)
         docs = list(backtest_results.find(query).sort("created_at", -1))
         return [V3Service._jsonify_document(doc) for doc in docs]
 
     @staticmethod
     def delete_backtest(backtest_id: str, user_id: Optional[str] = None) -> Dict[str, Any]:
-        result = backtest_results.delete_one({"backtest_id": backtest_id, **V3Service._build_user_scope(user_id)})
+        from bson.objectid import ObjectId
+        try:
+            object_id = ObjectId(backtest_id)
+        except Exception:
+            object_id = backtest_id
+        result = backtest_results.delete_one({"_id": object_id, **V3Service._build_user_scope(user_id)})
         return {"success": result.deleted_count > 0, "deleted": result.deleted_count > 0}
 
     @staticmethod
@@ -231,11 +236,15 @@ class V3Service:
     @staticmethod
     def paper_statistics(user_id: Optional[str] = None) -> Dict[str, Any]:
         query = V3Service._build_user_scope(user_id)
+        total_trades = closed_trades.count_documents(query)
+        wins = closed_trades.count_documents({"result": "WIN", **query})
+        losses = closed_trades.count_documents({"result": "LOSS", **query})
+        win_rate = round((wins / total_trades * 100), 2) if total_trades > 0 else 0
         return {
-            "total_trades": closed_trades.count_documents(query),
-            "wins": closed_trades.count_documents({"result": "WIN", **query}),
-            "losses": closed_trades.count_documents({"result": "LOSS", **query}),
-            "win_rate": 0,
+            "total_trades": total_trades,
+            "wins": wins,
+            "losses": losses,
+            "win_rate": win_rate,
         }
 
     @staticmethod
@@ -306,7 +315,9 @@ class V3Service:
         return V3Service._jsonify_document(doc)
 
     @staticmethod
-    def scheduler_jobs() -> Dict[str, Any]:
+    def scheduler_jobs(user_id: Optional[str] = None) -> Dict[str, Any]:
+        # Return the list of scheduler jobs. User_id is accepted for
+        # future per-user job scoping but currently not applied.
         return {"jobs": ["market_scanner", "paper_trading", "learning", "nightly_optimization", "report_generator"]}
 
     @staticmethod

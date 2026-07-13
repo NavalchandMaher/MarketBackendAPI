@@ -102,6 +102,14 @@ if connected:
 
     backtest_results.create_index([("strategy_name", ASCENDING), ("symbol", ASCENDING)])
 
+    # User scoping indexes for faster user-specific queries
+    backtest_results.create_index([("user_id", ASCENDING)])
+    paper_trades.create_index([("user_id", ASCENDING)])
+    closed_trades.create_index([("user_id", ASCENDING)])
+    learning_logs.create_index([("user_id", ASCENDING)])
+    notifications.create_index([("user_id", ASCENDING)])
+    settings.create_index([("user_id", ASCENDING)])
+
     market_snapshots.create_index([("symbol", ASCENDING), ("created_at", ASCENDING)])
 
     strategy_history.create_index([("strategy_name", ASCENDING), ("version", ASCENDING)])
