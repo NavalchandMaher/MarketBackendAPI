@@ -17,17 +17,21 @@ router = APIRouter(prefix="/v3", tags=["v3"])
 
 class StrategyPayload(BaseModel):
     strategy_name: Optional[str] = None
+    description: Optional[str] = None
     version: Optional[int] = 1
     enabled: Optional[bool] = True
     paper_mode: Optional[bool] = True
     live_mode: Optional[bool] = False
     priority: Optional[int] = 1
+    exchange: Optional[str] = "BINANCE"
     symbol: Optional[str] = "BTCUSDT"
     timeframe: Optional[str] = "5m"
+    strategy_type: Optional[str] = "Scalping"
     risk_percent: Optional[float] = 1.0
     tp: Optional[float] = 2.0
     sl: Optional[float] = 1.0
-    indicator_parameters: Optional[Dict[str, Any]] = Field(default_factory=dict)
+
+    indicator_parameters: Dict[str, Any] = Field(default_factory=dict)
 
 
 class BacktestPayload(BaseModel):

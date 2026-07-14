@@ -35,6 +35,8 @@ app = FastAPI(title="Market AI V2", version="3.0", lifespan=lifespan)
 
 ALLOWED_ORIGINS = [
     "http://localhost:54646",  # Flutter web/devtools origin observed in UI
+    "http://localhost:5000",  # Local Flutter web-server origin
+    "http://127.0.0.1:5000",
     "http://localhost:10000",  # Backend origin
     "http://127.0.0.1:10000",
 ]
