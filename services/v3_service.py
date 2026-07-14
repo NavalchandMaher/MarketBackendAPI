@@ -109,7 +109,9 @@ class V3Service:
         update = dict(payload)
         update["updated_at"] = datetime.utcnow()
         query = {"_id": object_id, **V3Service._build_user_scope(user_id)}
-        strategies.update_one(query, {"$set": update})
+        result = strategies.update_one(query, {"$set": update})
+        if result.matched_count == 0:
+            return None
         return V3Service.get_strategy(strategy_id, user_id)
 
     @staticmethod
