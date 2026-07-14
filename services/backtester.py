@@ -8,7 +8,7 @@ Runs historical simulations on Binance data.
 import ccxt
 import pandas as pd
 from datetime import datetime, timedelta
-from services.indicator_engine import calculate_all_indicators
+from services.indicator_engine import calculate_all_indicators, ema, rsi
 
 from db.mongodb import (
     backtest_results,
@@ -163,8 +163,206 @@ class BackTester:
     # =====================================================
 
     @staticmethod
+    def _prepare_history_for_strategy(history):
+        history = history.copy()
+
+        if len(history) < 2:
+            return history
+
+        if "rsi" not in history.columns or "macd" not in history.columns:
+            history = BackTester.prepare(history)
+
+        return history
+
+    @staticmethod
+    def _evaluate_condition(condition, history):
+        if not isinstance(condition, dict):
+            return False
+
+        if not condition.get("enabled", True):
+            return False
+
+        indicator = condition.get("indicator") or condition
+        if not isinstance(indicator, dict):
+            return False
+
+        indicator_id = str(indicator.get("id", "")).lower()
+        params = indicator.get("parameter") or indicator.get("parameters") or {}
+        if not isinstance(params, dict):
+            params = {}
+
+        candle = history.iloc[-1]
+        previous = history.iloc[-2] if len(history) > 1 else candle
+
+        if indicator_id == "ema":
+            fast_period = int(params.get("fast", 20) or 20)
+            slow_period = int(params.get("slow", 50) or 50)
+            history["ema_fast"] = ema(history, fast_period)
+            history["ema_slow"] = ema(history, slow_period)
+            candle = history.iloc[-1]
+            previous = history.iloc[-2] if len(history) > 1 else candle
+            current_fast = float(candle.get("ema_fast", 0))
+            current_slow = float(candle.get("ema_slow", 0))
+            prev_fast = float(previous.get("ema_fast", current_fast))
+            prev_slow = float(previous.get("ema_slow", current_slow))
+            condition_name = str(params.get("condition", "Bullish Cross")).lower()
+
+            if condition_name in {"bullish cross", "cross above"}:
+                return current_fast > current_slow and (prev_fast <= prev_slow or current_fast >= prev_fast)
+            if condition_name in {"bearish cross", "cross below"}:
+                return current_fast < current_slow and (prev_fast >= prev_slow or current_fast <= prev_fast)
+            if condition_name in {"above"}:
+                return current_fast > current_slow
+            if condition_name in {"below"}:
+                return current_fast < current_slow
+            return current_fast > current_slow
+
+        if indicator_id == "rsi":
+            period = int(params.get("length", params.get("period", 14)) or 14)
+            if "rsi" not in history.columns:
+                history["rsi"] = rsi(history, period)
+            candle = history.iloc[-1]
+            previous = history.iloc[-2] if len(history) > 1 else candle
+            value = float(candle.get("rsi", 0))
+            prev_value = float(previous.get("rsi", value))
+            threshold = float(params.get("value", params.get("overbought", 50)) or 50)
+            condition_name = str(params.get("condition", "Greater Than")).lower()
+
+            if condition_name == "greater than":
+                return value > threshold
+            if condition_name == "less than":
+                return value < threshold
+            if condition_name == "cross above":
+                return value > threshold and prev_value <= threshold
+            if condition_name == "cross below":
+                return value < threshold and prev_value >= threshold
+            if condition_name == "overbought":
+                return value > float(params.get("overbought", 70) or 70)
+            if condition_name == "oversold":
+                return value < float(params.get("oversold", 30) or 30)
+            return value < float(params.get("oversold", 30) or 30)
+
+        if indicator_id == "macd":
+            if "macd" not in history.columns or "macd_signal" not in history.columns:
+                history = BackTester.prepare(history)
+            candle = history.iloc[-1]
+            current_macd = float(candle.get("macd", 0))
+            current_signal = float(candle.get("macd_signal", 0))
+            condition_name = str(params.get("condition", "Bullish Cross")).lower()
+            if condition_name in {"bullish cross", "macd above signal"}:
+                return current_macd > current_signal
+            if condition_name in {"bearish cross", "macd below signal"}:
+                return current_macd < current_signal
+            if condition_name == "histogram > 0":
+                return float(candle.get("macd_histogram", 0)) > 0
+            if condition_name == "histogram < 0":
+                return float(candle.get("macd_histogram", 0)) < 0
+            return current_macd > current_signal
+
+        if indicator_id == "supertrend":
+            if "supertrend_direction" not in history.columns:
+                history = BackTester.prepare(history)
+            candle = history.iloc[-1]
+            direction = str(candle.get("supertrend_direction", "BULLISH")).upper()
+            current_price = float(candle.get("close", 0))
+            current_supertrend = float(candle.get("supertrend", 0))
+            condition_name = str(params.get("condition", "Trend Up")).lower()
+            if condition_name in {"trend up", "trend change"}:
+                return direction == "BULLISH"
+            if condition_name in {"trend down"}:
+                return direction == "BEARISH"
+            if condition_name in {"price above supertrend"}:
+                return current_price > current_supertrend
+            if condition_name in {"price below supertrend"}:
+                return current_price < current_supertrend
+            return direction == "BULLISH"
+
+        if indicator_id == "vwap":
+            if "vwap" not in history.columns:
+                history = BackTester.prepare(history)
+            candle = history.iloc[-1]
+            current_price = float(candle.get("close", 0))
+            current_vwap = float(candle.get("vwap", 0))
+            condition_name = str(params.get("condition", "Above VWAP")).lower()
+            if condition_name in {"above vwap"}:
+                return current_price > current_vwap
+            if condition_name in {"below vwap"}:
+                return current_price < current_vwap
+            if condition_name in {"cross above"}:
+                return current_price > current_vwap and float(previous.get("close", 0)) <= float(previous.get("vwap", 0))
+            if condition_name in {"cross below"}:
+                return current_price < current_vwap and float(previous.get("close", 0)) >= float(previous.get("vwap", 0))
+            return current_price > current_vwap
+
+        if indicator_id == "adx":
+            if "adx" not in history.columns:
+                history = BackTester.prepare(history)
+            candle = history.iloc[-1]
+            adx_value = float(candle.get("adx", 0))
+            condition_name = str(params.get("condition", "ADX >")).lower()
+            if condition_name in {"adx >"}:
+                return adx_value > float(params.get("value", 25) or 25)
+            if condition_name in {"adx <"}:
+                return adx_value < float(params.get("value", 25) or 25)
+            if condition_name in {"strong trend"}:
+                return adx_value >= 25
+            if condition_name in {"weak trend"}:
+                return adx_value < 25
+            return adx_value > float(params.get("value", 25) or 25)
+
+        if indicator_id == "bollinger":
+            if "bb_upper" not in history.columns:
+                history = BackTester.prepare(history)
+            candle = history.iloc[-1]
+            upper = float(candle.get("bb_upper", 0))
+            lower = float(candle.get("bb_lower", 0))
+            current_price = float(candle.get("close", 0))
+            condition_name = str(params.get("condition", "Upper Breakout")).lower()
+            if condition_name in {"upper breakout", "price above upper"}:
+                return current_price > upper
+            if condition_name in {"lower breakout", "price below lower"}:
+                return current_price < lower
+            return current_price > upper
+
+        if indicator_id == "atr":
+            if "atr" not in history.columns:
+                history = BackTester.prepare(history)
+            candle = history.iloc[-1]
+            atr_value = float(candle.get("atr", 0))
+            condition_name = str(params.get("condition", "ATR >")).lower()
+            if condition_name == "atr >":
+                return atr_value > float(params.get("value", 2.0) or 2.0)
+            if condition_name == "atr <":
+                return atr_value < float(params.get("value", 2.0) or 2.0)
+            if condition_name in {"atr increasing", "atr rising"}:
+                return atr_value > float(previous.get("atr", atr_value))
+            if condition_name in {"atr decreasing", "atr falling"}:
+                return atr_value < float(previous.get("atr", atr_value))
+            return atr_value > float(params.get("value", 2.0) or 2.0)
+
+        return False
+
+    @staticmethod
     def execute_strategy(history, strategy):
         try:
+            history = BackTester._prepare_history_for_strategy(history)
+
+            buy_conditions = strategy.get("buy_conditions") or []
+            sell_conditions = strategy.get("sell_conditions") or []
+            if not buy_conditions and not sell_conditions:
+                indicator_params = strategy.get("indicator_parameters") or {}
+                if isinstance(indicator_params, dict):
+                    buy_conditions = indicator_params.get("buy_conditions") or []
+                    sell_conditions = indicator_params.get("sell_conditions") or []
+
+            if buy_conditions:
+                if all(BackTester._evaluate_condition(condition, history) for condition in buy_conditions if condition.get("enabled", True)):
+                    return "BUY"
+
+            if sell_conditions:
+                if all(BackTester._evaluate_condition(condition, history) for condition in sell_conditions if condition.get("enabled", True)):
+                    return "SELL"
+
             candle = history.iloc[-1]
 
             score = 0

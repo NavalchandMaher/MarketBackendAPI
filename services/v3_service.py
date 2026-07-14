@@ -125,6 +125,38 @@ class V3Service:
         return {"success": result.deleted_count > 0, "deleted": result.deleted_count > 0}
 
     @staticmethod
+    def _resolve_strategy_payload(payload: Dict[str, Any], user_id: Optional[str] = None) -> Dict[str, Any]:
+        resolved = dict(payload)
+
+        strategy_name = resolved.get("strategy_name")
+        if not strategy_name:
+            return resolved
+
+        query = {"strategy_name": strategy_name}
+        if user_id:
+            query["user_id"] = user_id
+
+        strategy_doc = strategies.find_one(query)
+        if not strategy_doc:
+            return resolved
+
+        for key in ["risk_percent", "tp", "sl", "symbol", "timeframe", "enabled", "paper_mode", "live_mode", "version", "priority"]:
+            if key in strategy_doc and resolved.get(key) in (None, ""):
+                resolved[key] = strategy_doc.get(key)
+
+        if not resolved.get("indicator_parameters"):
+            resolved["indicator_parameters"] = strategy_doc.get("indicator_parameters", {}) or {}
+        elif isinstance(resolved.get("indicator_parameters"), dict) and isinstance(strategy_doc.get("indicator_parameters"), dict):
+            merged = dict(strategy_doc.get("indicator_parameters", {}))
+            merged.update(resolved["indicator_parameters"])
+            resolved["indicator_parameters"] = merged
+
+        if resolved.get("strategy_name") in {None, ""}:
+            resolved["strategy_name"] = strategy_doc.get("strategy_name")
+
+        return resolved
+
+    @staticmethod
     def run_backtest(
         payload: Dict[str, Any],
         user_id: Optional[str] = None,
@@ -140,12 +172,62 @@ class V3Service:
                 pass
 
         try:
-            report = BackTester.run(
-                symbol=payload.get("symbol", "BTCUSDT"),
-                timeframe=payload.get("timeframe", "5m"),
-                days=payload.get("days", 365),
-                user_id=user_id,
-            )
+            resolved_payload = V3Service._resolve_strategy_payload(payload, user_id=user_id)
+
+            # If a full strategy payload was provided (indicator parameters or strategy_name),
+            # run the backtest for that single strategy. Otherwise run the dashboard (all strategies).
+            if resolved_payload.get("indicator_parameters") or resolved_payload.get("strategy_name"):
+                # Load and prepare history
+                df = BackTester.load_history(
+                    resolved_payload.get("symbol", "BTCUSDT"),
+                    resolved_payload.get("timeframe", "5m"),
+                    resolved_payload.get("days", 365),
+                )
+                df = BackTester.prepare(df)
+
+                # Construct a strategy payload that preserves the new UI condition structure.
+                ind_params = payload.get("indicator_parameters", {}) or {}
+                if not isinstance(ind_params, dict):
+                    ind_params = {}
+
+                strategy_def = {
+                    "strategy_name": resolved_payload.get("strategy_name"),
+                    "version": resolved_payload.get("version", 1),
+                    "tp_percent": resolved_payload.get("tp", 2.0),
+                    "sl_percent": resolved_payload.get("sl", 1.0),
+                    "buy_threshold": resolved_payload.get("buy_threshold", 3),
+                    "sell_threshold": resolved_payload.get("sell_threshold", -3),
+                    "buy_conditions": ind_params.get("buy_conditions", []),
+                    "sell_conditions": ind_params.get("sell_conditions", []),
+                }
+
+                # Keep the legacy flat fields populated when simple RSI odds are present.
+                if isinstance(ind_params, dict):
+                    for cond in ind_params.get("buy_conditions", []):
+                        indicator = cond.get("indicator", {})
+                        if indicator.get("id") == "rsi":
+                            params = indicator.get("parameter", {}) or {}
+                            strategy_def["rsi_buy"] = params.get("value") or params.get("oversold") or params.get("length")
+                            strategy_def["rsi_sell"] = params.get("overbought")
+                            break
+
+                # Run the single-strategy backtest
+                trades = BackTester.run_strategy(df, strategy_def)
+                single_report = BackTester.report(trades)
+                single_report["strategy_name"] = strategy_def.get("strategy_name") or "PAYLOAD_STRATEGY"
+                single_report["strategy_version"] = strategy_def.get("version", 1)
+                single_report["symbol"] = resolved_payload.get("symbol", "BTCUSDT")
+                single_report["timeframe"] = resolved_payload.get("timeframe", "5m")
+                single_report["days"] = resolved_payload.get("days", 365)
+
+                report = single_report
+            else:
+                report = BackTester.run(
+                    symbol=resolved_payload.get("symbol", "BTCUSDT"),
+                    timeframe=resolved_payload.get("timeframe", "5m"),
+                    days=resolved_payload.get("days", 365),
+                    user_id=user_id,
+                )
         except Exception as exc:
             raise RuntimeError(f"BackTester.run failed: {exc}") from exc
 

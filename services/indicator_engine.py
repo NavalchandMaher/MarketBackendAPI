@@ -205,11 +205,21 @@ def prepare_basic_indicators(df):
 
 def atr(df, period=14):
 
-    indicator = ta.volatility.AverageTrueRange(
-        high=df["high"], low=df["low"], close=df["close"], window=period
-    )
+    if len(df) < 2:
+        return pd.Series(0.0, index=df.index, dtype=float)
 
-    return indicator.average_true_range()
+    try:
+        indicator = ta.volatility.AverageTrueRange(
+            high=df["high"], low=df["low"], close=df["close"], window=period
+        )
+        return indicator.average_true_range()
+    except Exception:
+        high_low = df["high"] - df["low"]
+        high_close = np.abs(df["high"] - df["close"].shift())
+        low_close = np.abs(df["low"] - df["close"].shift())
+        tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
+        window = max(1, min(period, len(df)))
+        return tr.rolling(window=window).mean()
 
 
 # ==========================================================
@@ -219,15 +229,26 @@ def atr(df, period=14):
 
 def adx(df, period=14):
 
-    indicator = ta.trend.ADXIndicator(
-        high=df["high"], low=df["low"], close=df["close"], window=period
-    )
+    if len(df) < 2:
+        df["adx"] = 0.0
+        df["plus_di"] = 0.0
+        df["minus_di"] = 0.0
+        return df
 
-    df["adx"] = indicator.adx()
+    try:
+        indicator = ta.trend.ADXIndicator(
+            high=df["high"], low=df["low"], close=df["close"], window=period
+        )
 
-    df["plus_di"] = indicator.adx_pos()
+        df["adx"] = indicator.adx()
 
-    df["minus_di"] = indicator.adx_neg()
+        df["plus_di"] = indicator.adx_pos()
+
+        df["minus_di"] = indicator.adx_neg()
+    except Exception:
+        df["adx"] = 0.0
+        df["plus_di"] = 0.0
+        df["minus_di"] = 0.0
 
     return df
 
@@ -239,13 +260,27 @@ def adx(df, period=14):
 
 def bollinger(df):
 
-    bb = ta.volatility.BollingerBands(close=df["close"], window=20, window_dev=2)
+    if len(df) < 2:
+        df["bb_upper"] = df["close"]
+        df["bb_middle"] = df["close"]
+        df["bb_lower"] = df["close"]
+        df["bb_width"] = 0.0
+        return df
 
-    df["bb_upper"] = bb.bollinger_hband()
+    try:
+        bb = ta.volatility.BollingerBands(close=df["close"], window=20, window_dev=2)
 
-    df["bb_middle"] = bb.bollinger_mavg()
+        df["bb_upper"] = bb.bollinger_hband()
 
-    df["bb_lower"] = bb.bollinger_lband()
+        df["bb_middle"] = bb.bollinger_mavg()
+
+        df["bb_lower"] = bb.bollinger_lband()
+    except Exception:
+        rolling_mean = df["close"].rolling(window=20, min_periods=1).mean()
+        rolling_std = df["close"].rolling(window=20, min_periods=1).std()
+        df["bb_middle"] = rolling_mean
+        df["bb_upper"] = rolling_mean + (2 * rolling_std)
+        df["bb_lower"] = rolling_mean - (2 * rolling_std)
 
     df["bb_width"] = df["bb_upper"] - df["bb_lower"]
 
@@ -259,15 +294,22 @@ def bollinger(df):
 
 def vwap(df):
 
-    indicator = ta.volume.VolumeWeightedAveragePrice(
-        high=df["high"],
-        low=df["low"],
-        close=df["close"],
-        volume=df["volume"],
-        window=14,
-    )
+    if len(df) < 1:
+        return pd.Series(0.0, index=df.index, dtype=float)
 
-    return indicator.volume_weighted_average_price()
+    try:
+        indicator = ta.volume.VolumeWeightedAveragePrice(
+            high=df["high"],
+            low=df["low"],
+            close=df["close"],
+            volume=df["volume"],
+            window=14,
+        )
+
+        return indicator.volume_weighted_average_price()
+    except Exception:
+        typical_price = (df["high"] + df["low"] + df["close"]) / 3
+        return (typical_price * df["volume"]).cumsum() / df["volume"].cumsum().replace(0, np.nan)
 
 
 # ==========================================================
