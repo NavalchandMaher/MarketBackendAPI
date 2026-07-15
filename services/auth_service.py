@@ -104,6 +104,8 @@ class AuthService:
             logger.error(f"[AUTH] Error retrieving user: {str(e)}")
             return None
 
+    ALLOWED_ROLES = {"Admin", "Trader"}
+
     @staticmethod
     def create_user(payload: Dict[str, Any]) -> Dict[str, Any]:
         email = payload.get("email", "").strip().lower()
@@ -112,14 +114,27 @@ class AuthService:
         if AuthService.get_user_by_email(email):
             logger.warning(f"[AUTH] Registration failed - email already exists: {email}")
             raise HTTPException(status_code=400, detail="Email already registered")
-        
+
+        requested_role = str(payload.get("role", "Trader")).title()
+        if requested_role not in AuthService.ALLOWED_ROLES:
+            requested_role = "Trader"
+
+        if requested_role == "Admin":
+            logger.debug("[AUTH] Admin registration requested")
+            if users.count_documents({"role": "Admin"}, limit=1) > 0:
+                logger.warning("[AUTH] Admin registration blocked - admin already exists")
+                raise HTTPException(
+                    status_code=403,
+                    detail="Only one Admin user is allowed",
+                )
+
         user_doc = {
             "user_id": str(uuid.uuid4()),
             "full_name": payload.get("full_name", ""),
             "email": email,
             "mobile_number": payload.get("mobile_number", ""),
             "password": AuthService._hash_password(payload["password"]),
-            "role": payload.get("role", "Trader"),
+            "role": requested_role,
             "status": "ACTIVE",
             "created_date": datetime.utcnow(),
             "last_login": None,

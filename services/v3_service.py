@@ -61,16 +61,26 @@ class V3Service:
         }
 
     @staticmethod
-    def list_strategies(user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def list_strategies(user_id: Optional[str] = None, role: Optional[str] = None) -> List[Dict[str, Any]]:
+        # For non-admin users, only include System strategies that are published
         if user_id:
-            query = {"$or": [{"user_id": user_id}, {"strategy_type": "System"}]}
+            if str(role).lower() == "admin":
+                query = {"$or": [{"user_id": user_id}, {"strategy_type": "System"}]}
+            else:
+                query = {
+                    "$or": [
+                        {"user_id": user_id},
+                        {"$and": [{"strategy_type": "System"}, {"published": True}]},
+                    ]
+                }
         else:
+            # No user scoping — return all (admins calling without user_id)
             query = {}
         docs = list(strategies.find(query).sort("created_at", -1))
         return [V3Service._jsonify_document(doc) for doc in docs]
 
     @staticmethod
-    def get_strategy(strategy_id: str, user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    def get_strategy(strategy_id: str, user_id: Optional[str] = None, role: Optional[str] = None) -> Optional[Dict[str, Any]]:
         from bson.objectid import ObjectId
         try:
             object_id = ObjectId(strategy_id)
@@ -78,10 +88,20 @@ class V3Service:
             object_id = strategy_id
 
         if user_id:
-            query = {
-                "_id": object_id,
-                "$or": [{"user_id": user_id}, {"strategy_type": "System"}],
-            }
+            if str(role).lower() == "admin":
+                query = {
+                    "_id": object_id,
+                    "$or": [{"user_id": user_id}, {"strategy_type": "System"}],
+                }
+            else:
+                # Non-admins may only see their own strategies or published System strategies
+                query = {
+                    "_id": object_id,
+                    "$or": [
+                        {"user_id": user_id},
+                        {"$and": [{"strategy_type": "System"}, {"published": True}]},
+                    ],
+                }
         else:
             query = {"_id": object_id}
 
@@ -119,6 +139,9 @@ class V3Service:
             "sl": payload.get("sl", 1.0),
             "is_default": payload.get("is_default", False),
             "indicator_parameters": payload.get("indicator_parameters", {}),
+            "created_by": payload.get("created_by", "TRADER"),
+            # Persist published flag so system strategies visibility works as intended
+            "published": bool(payload.get("published", False)),
             "created_at": datetime.utcnow(),
             "updated_at": datetime.utcnow(),
         }
@@ -127,7 +150,7 @@ class V3Service:
         return V3Service._jsonify_document(doc)
 
     @staticmethod
-    def update_strategy(strategy_id: str, payload: Dict[str, Any], user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    def update_strategy(strategy_id: str, payload: Dict[str, Any], user_id: Optional[str] = None, role: Optional[str] = None) -> Optional[Dict[str, Any]]:
         from bson.objectid import ObjectId
         try:
             object_id = ObjectId(strategy_id)
@@ -152,6 +175,11 @@ class V3Service:
 
         update = dict(payload)
         update["updated_at"] = datetime.utcnow()
+
+        # Prevent lowering created_by for existing system strategies unless explicitly provided by Admin logic.
+        if existing.get("strategy_type") == "System" and "created_by" not in update:
+            update["created_by"] = existing.get("created_by", "SYSTEM")
+
         if user_id:
             query = {
                 "_id": object_id,
@@ -163,7 +191,7 @@ class V3Service:
         result = strategies.update_one(query, {"$set": update})
         if result.matched_count == 0:
             return None
-        return V3Service.get_strategy(strategy_id, user_id)
+        return V3Service.get_strategy(strategy_id, user_id=user_id, role=role)
 
     @staticmethod
     def delete_strategy(strategy_id: str, user_id: Optional[str] = None) -> Dict[str, Any]:

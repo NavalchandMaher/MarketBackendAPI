@@ -31,6 +31,7 @@ class StrategyPayload(BaseModel):
     tp: Optional[float] = 2.0
     sl: Optional[float] = 1.0
     is_default: Optional[bool] = False
+    published: Optional[bool] = False
 
     indicator_parameters: Dict[str, Any] = Field(default_factory=dict)
 
@@ -84,12 +85,13 @@ def analysis(symbol: str = Query("BTCUSDT"), timeframe: str = Query("5m"), user=
 
 @router.get("/strategies")
 def strategies_list(user=Depends(AuthService.get_current_user)):
-    return V3Service.list_strategies(user_id=str(user["_id"]))
+    # Only return published System strategies to non-admin users
+    return V3Service.list_strategies(user_id=str(user["_id"]), role=user.get("role"))
 
 
 @router.get("/strategies/{strategy_id}")
 def strategy_detail(strategy_id: str, user=Depends(AuthService.get_current_user)):
-    strategy = V3Service.get_strategy(strategy_id, user_id=str(user["_id"]))
+    strategy = V3Service.get_strategy(strategy_id, user_id=str(user["_id"]), role=user.get("role"))
     if not strategy:
         raise HTTPException(status_code=404, detail="Strategy not found")
     return strategy
@@ -98,13 +100,61 @@ def strategy_detail(strategy_id: str, user=Depends(AuthService.get_current_user)
 @router.post("/strategies", status_code=201)
 def create_strategy(payload: StrategyPayload, user=Depends(AuthService.get_current_user)):
     data = payload.model_dump(exclude_none=True)
-    data["user_id"] = str(user["_id"])
+    # Determine creator type from user role
+    role = user.get("role", "Trader")
+    created_by = "SYSTEM" if str(role).lower() == "admin" else "TRADER"
+
+    # Enforce admin-only creation for System strategies
+    if data.get("strategy_type") == "System":
+        if str(role).lower() != "admin":
+            raise HTTPException(status_code=403, detail="Only admins can create system strategies")
+        # System strategies are global — do not attach a user_id
+        data.pop("user_id", None)
+        # Admin may set published flag; default False
+        data["published"] = bool(data.get("published", False))
+    else:
+        # User-scoped strategy
+        data["user_id"] = str(user["_id"])
+        # Non-system strategies are not published to all users
+        data["published"] = False
+
+    # Always record who created the strategy based on the actor's role
+    data["created_by"] = created_by
+
     return V3Service.create_strategy(data)
 
 
 @router.put("/strategies/{strategy_id}")
 def update_strategy(strategy_id: str, payload: StrategyPayload, user=Depends(AuthService.get_current_user)):
-    updated = V3Service.update_strategy(strategy_id, payload.model_dump(exclude_none=True), user_id=str(user["_id"]))
+    # Fetch existing strategy with role-aware visibility
+    existing_strategy = V3Service.get_strategy(strategy_id, user_id=str(user["_id"]), role=user.get("role"))
+    if not existing_strategy:
+        raise HTTPException(status_code=404, detail="Strategy not found")
+
+    if existing_strategy.get("strategy_type") == "System" and user.get("role") != "Admin":
+        raise HTTPException(status_code=403, detail="Only admins can update system strategies")
+
+    if payload.strategy_type == "System" and user.get("role") != "Admin":
+        raise HTTPException(status_code=403, detail="Only admins can change strategy type to System")
+
+    data = payload.model_dump(exclude_none=True)
+
+    # Ensure created_by reflects the updater's role when creating/changing ownership
+    role = user.get("role", "Trader")
+    if data.get("strategy_type") == "System":
+        data["created_by"] = "SYSTEM"
+        # Only Admins may change the published flag
+        if "published" in data and str(role).lower() != "admin":
+            raise HTTPException(status_code=403, detail="Only admins can change published state for System strategies")
+        # If published not provided, preserve existing published flag (default False)
+        data["published"] = bool(data.get("published", True if existing_strategy.get("published") else False))
+    else:
+        # For non-system strategies, mark created_by according to the actor (Admin actions are still SYSTEM)
+        data.setdefault("created_by", "SYSTEM" if str(role).lower() == "admin" else "TRADER")
+        # Ensure non-system strategies are not published globally
+        data["published"] = False
+
+    updated = V3Service.update_strategy(strategy_id, data, user_id=str(user["_id"]), role=user.get("role"))
     if not updated:
         raise HTTPException(status_code=404, detail="Strategy not found")
     return updated
@@ -112,6 +162,16 @@ def update_strategy(strategy_id: str, payload: StrategyPayload, user=Depends(Aut
 
 @router.delete("/strategies/{strategy_id}")
 def delete_strategy(strategy_id: str, user=Depends(AuthService.get_current_user)):
+    existing_strategy = V3Service.get_strategy(strategy_id, user_id=str(user["_id"]))
+    if not existing_strategy:
+        raise HTTPException(status_code=404, detail="Strategy not found")
+
+    if existing_strategy.get("strategy_type") == "System" and user.get("role") != "Admin":
+        raise HTTPException(status_code=403, detail="Only admins can delete system strategies")
+
+    if existing_strategy.get("strategy_type") == "System":
+        return V3Service.delete_strategy(strategy_id, user_id=None)
+
     return V3Service.delete_strategy(strategy_id, user_id=str(user["_id"]))
 
 
