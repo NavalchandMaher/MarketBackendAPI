@@ -148,7 +148,8 @@ def create_strategy(payload: StrategyPayload, user=Depends(AuthService.get_curre
         # User-scoped strategy
         data["user_id"] = str(user["_id"])
         # Non-system strategies are not published to all users
-        data["published"] = False
+        # and published is not required for trader-owned strategies.
+        data.pop("published", None)
 
     # Always record who created the strategy based on the actor's role
     data["created_by"] = created_by
