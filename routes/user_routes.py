@@ -19,6 +19,7 @@ class UserProfilePayload(BaseModel):
     default_timeframe: Optional[str] = None
     theme: Optional[str] = None
     notification_settings: Optional[Dict[str, Any]] = None
+    status: Optional[str] = None
 
 
 @router.get("/me")
@@ -100,6 +101,13 @@ def update_user(user_id: str, payload: UserProfilePayload, user=Depends(AuthServ
     if not update:
         logger.debug(f"[ROUTES] No updates provided for user: {user_id}")
         return {"success": True, "message": "No updates provided"}
+
+    if "status" in update:
+        update["status"] = str(update["status"]).upper()
+        if update["status"] not in {"ACTIVE", "DISABLED"}:
+            raise HTTPException(status_code=400, detail="Invalid status value")
+        if str(user_id) == str(user["_id"]) and update["status"] == "DISABLED":
+            raise HTTPException(status_code=403, detail="Admin cannot disable own account")
     
     result = user_collection.update_one({"_id": object_id}, {"$set": update})
     

@@ -49,6 +49,10 @@ class BacktestPayload(BaseModel):
     date_range: Optional[Dict[str, str]] = None
 
 
+class PublishPayload(BaseModel):
+    published: bool = False
+
+
 class BrokerPayload(BaseModel):
     broker: Optional[str] = None
     api_key: Optional[str] = None
@@ -95,6 +99,34 @@ def strategy_detail(strategy_id: str, user=Depends(AuthService.get_current_user)
     if not strategy:
         raise HTTPException(status_code=404, detail="Strategy not found")
     return strategy
+
+
+@router.get("/admin/strategies")
+def admin_list_strategies(user=Depends(AuthService.require_role("Admin"))):
+    return V3Service.list_all_strategies()
+
+
+@router.put("/strategies/{strategy_id}/publish")
+def publish_strategy(
+    strategy_id: str,
+    payload: PublishPayload,
+    user=Depends(AuthService.require_role("Admin")),
+):
+    existing_strategy = V3Service.get_strategy(strategy_id, user_id=str(user["_id"]), role=user.get("role"))
+    if not existing_strategy:
+        raise HTTPException(status_code=404, detail="Strategy not found")
+    if existing_strategy.get("strategy_type") != "System":
+        raise HTTPException(status_code=403, detail="Only system strategies can be published")
+
+    updated = V3Service.update_strategy(
+        strategy_id,
+        {"published": payload.published},
+        user_id=str(user["_id"]),
+        role=user.get("role"),
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Strategy not found")
+    return updated
 
 
 @router.post("/strategies", status_code=201)

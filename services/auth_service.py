@@ -163,6 +163,9 @@ class AuthService:
         if not AuthService._verify_password(password, user.get("password", "")):
             logger.warning(f"[AUTH] Authentication failed - invalid password: {email}")
             return None
+        if str(user.get("status", "ACTIVE")).upper() != "ACTIVE":
+            logger.warning(f"[AUTH] Authentication failed - inactive account: {email}")
+            return None
         logger.debug(f"[AUTH] User authenticated successfully: {email}")
         return user
 
@@ -171,8 +174,8 @@ class AuthService:
         logger.info(f"[AUTH] Login attempt: {email}")
         user = AuthService.authenticate_user(email, password)
         if not user:
-            logger.warning(f"[AUTH] Login failed - invalid credentials: {email}")
-            raise HTTPException(status_code=401, detail="Invalid credentials")
+            logger.warning(f"[AUTH] Login failed - invalid credentials or inactive account: {email}")
+            raise HTTPException(status_code=401, detail="Invalid credentials or inactive account")
         
         try:
             # Update last login
@@ -233,6 +236,13 @@ class AuthService:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="User not found"
+            )
+
+        if str(user.get("status", "ACTIVE")).upper() != "ACTIVE":
+            logger.warning(f"[AUTH] Access denied for inactive user: {user.get('email')}")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User account is disabled",
             )
         
         logger.debug(f"[AUTH] Authentication successful for user: {user.get('email')}")

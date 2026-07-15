@@ -80,6 +80,11 @@ class V3Service:
         return [V3Service._jsonify_document(doc) for doc in docs]
 
     @staticmethod
+    def list_all_strategies() -> List[Dict[str, Any]]:
+        docs = list(strategies.find({}).sort("created_at", -1))
+        return [V3Service._jsonify_document(doc) for doc in docs]
+
+    @staticmethod
     def get_strategy(strategy_id: str, user_id: Optional[str] = None, role: Optional[str] = None) -> Optional[Dict[str, Any]]:
         from bson.objectid import ObjectId
         try:
