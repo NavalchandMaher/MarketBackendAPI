@@ -30,6 +30,7 @@ class StrategyPayload(BaseModel):
     risk_percent: Optional[float] = 1.0
     tp: Optional[float] = 2.0
     sl: Optional[float] = 1.0
+    is_default: Optional[bool] = False
 
     indicator_parameters: Dict[str, Any] = Field(default_factory=dict)
 
@@ -78,7 +79,7 @@ def dashboard(user=Depends(AuthService.get_current_user)):
 @router.get("/analysis")
 def analysis(symbol: str = Query("BTCUSDT"), timeframe: str = Query("5m"), user=Depends(AuthService.get_current_user)):
     """Market analysis endpoint - requires authentication"""
-    return analyze_market(symbol, timeframe)
+    return analyze_market(symbol, timeframe, user_id=str(user["_id"]))
 
 
 @router.get("/strategies")

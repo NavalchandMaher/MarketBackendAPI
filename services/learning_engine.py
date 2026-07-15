@@ -31,13 +31,24 @@ class LearningEngine:
 
     @staticmethod
     def active_strategy(user_id=None):
-        query = {"enabled": True}
+        strategy = None
+
         if user_id:
-            query["user_id"] = user_id
-        strategy = strategies.find_one(query)
+            strategy = strategies.find_one(
+                {"enabled": True, "user_id": user_id, "is_default": True}
+            )
+            if not strategy:
+                strategy = strategies.find_one(
+                    {"enabled": True, "user_id": user_id}
+                )
+        else:
+            strategy = strategies.find_one(
+                {"enabled": True, "is_default": True, "user_id": {"$exists": False}}
+            )
+            if not strategy:
+                strategy = strategies.find_one({"enabled": True})
 
         if strategy:
-
             strategy["_id"] = str(strategy["_id"])
 
         return strategy

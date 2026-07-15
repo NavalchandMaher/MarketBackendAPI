@@ -44,7 +44,7 @@ class V3Service:
         latest_strategy = strategies.find_one(query, sort=[("created_at", -1)])
         latest_signal = {"signal": "WAIT", "confidence": 0, "price": 0}
         try:
-            latest_signal = analyze_market(symbol="BTCUSDT", timeframe="5m")
+            latest_signal = analyze_market(symbol="BTCUSDT", timeframe="5m", user_id=user_id)
         except Exception as exc:
             logger.exception("dashboard summary signal failed: %s", exc)
         return {
@@ -78,8 +78,15 @@ class V3Service:
 
     @staticmethod
     def create_strategy(payload: Dict[str, Any]) -> Dict[str, Any]:
+        user_id = payload.get("user_id")
+        if payload.get("is_default") and user_id:
+            strategies.update_many(
+                {"user_id": user_id, "is_default": True},
+                {"$set": {"is_default": False}},
+            )
+
         doc = {
-            "user_id": payload.get("user_id"),
+            "user_id": user_id,
             "strategy_name": payload.get("strategy_name", "NEW_STRATEGY"),
             "version": payload.get("version", 1),
             "enabled": payload.get("enabled", True),
@@ -88,9 +95,11 @@ class V3Service:
             "priority": payload.get("priority", 1),
             "symbol": payload.get("symbol", "BTCUSDT"),
             "timeframe": payload.get("timeframe", "5m"),
+            "strategy_type": payload.get("strategy_type", "Scalping"),
             "risk_percent": payload.get("risk_percent", 1.0),
             "tp": payload.get("tp", 2.0),
             "sl": payload.get("sl", 1.0),
+            "is_default": payload.get("is_default", False),
             "indicator_parameters": payload.get("indicator_parameters", {}),
             "created_at": datetime.utcnow(),
             "updated_at": datetime.utcnow(),
@@ -106,6 +115,13 @@ class V3Service:
             object_id = ObjectId(strategy_id)
         except Exception:
             object_id = strategy_id
+
+        if payload.get("is_default") and user_id:
+            strategies.update_many(
+                {"user_id": user_id, "is_default": True, "_id": {"$ne": object_id}},
+                {"$set": {"is_default": False}},
+            )
+
         update = dict(payload)
         update["updated_at"] = datetime.utcnow()
         query = {"_id": object_id, **V3Service._build_user_scope(user_id)}

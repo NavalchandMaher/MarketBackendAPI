@@ -281,7 +281,7 @@ def calculate_indicators(df):
 # ============================================================
 
 
-def analyze_market(symbol="BTCUSDT", timeframe="5m"):
+def analyze_market(symbol="BTCUSDT", timeframe="5m", user_id=None):
 
     # ---------------------------------------
     # VALIDATE TIMEFRAME
