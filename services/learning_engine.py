@@ -41,6 +41,14 @@ class LearningEngine:
                 strategy = strategies.find_one(
                     {"enabled": True, "user_id": user_id}
                 )
+            if not strategy:
+                strategy = strategies.find_one(
+                    {"enabled": True, "strategy_type": "System", "is_default": True}
+                )
+                if not strategy:
+                    strategy = strategies.find_one(
+                        {"enabled": True, "strategy_type": "System"}
+                    )
         else:
             strategy = strategies.find_one(
                 {"enabled": True, "is_default": True, "user_id": {"$exists": False}}

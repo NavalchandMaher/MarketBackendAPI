@@ -62,28 +62,46 @@ class V3Service:
 
     @staticmethod
     def list_strategies(user_id: Optional[str] = None) -> List[Dict[str, Any]]:
-        query = V3Service._build_user_scope(user_id)
+        if user_id:
+            query = {"$or": [{"user_id": user_id}, {"strategy_type": "System"}]}
+        else:
+            query = {}
         docs = list(strategies.find(query).sort("created_at", -1))
         return [V3Service._jsonify_document(doc) for doc in docs]
 
     @staticmethod
     def get_strategy(strategy_id: str, user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         from bson.objectid import ObjectId
-        query = V3Service._build_user_scope(user_id)
         try:
-            doc = strategies.find_one({"_id": ObjectId(strategy_id), **query})
+            object_id = ObjectId(strategy_id)
         except Exception:
-            doc = strategies.find_one({"_id": strategy_id, **query})
+            object_id = strategy_id
+
+        if user_id:
+            query = {
+                "_id": object_id,
+                "$or": [{"user_id": user_id}, {"strategy_type": "System"}],
+            }
+        else:
+            query = {"_id": object_id}
+
+        doc = strategies.find_one(query)
         return V3Service._jsonify_document(doc)
 
     @staticmethod
     def create_strategy(payload: Dict[str, Any]) -> Dict[str, Any]:
         user_id = payload.get("user_id")
-        if payload.get("is_default") and user_id:
-            strategies.update_many(
-                {"user_id": user_id, "is_default": True},
-                {"$set": {"is_default": False}},
-            )
+        if payload.get("is_default"):
+            if user_id:
+                strategies.update_many(
+                    {"user_id": user_id, "is_default": True},
+                    {"$set": {"is_default": False}},
+                )
+            elif payload.get("strategy_type") == "System":
+                strategies.update_many(
+                    {"strategy_type": "System", "is_default": True},
+                    {"$set": {"is_default": False}},
+                )
 
         doc = {
             "user_id": user_id,
@@ -116,15 +134,32 @@ class V3Service:
         except Exception:
             object_id = strategy_id
 
-        if payload.get("is_default") and user_id:
-            strategies.update_many(
-                {"user_id": user_id, "is_default": True, "_id": {"$ne": object_id}},
-                {"$set": {"is_default": False}},
-            )
+        existing = strategies.find_one({"_id": object_id})
+        if not existing:
+            return None
+
+        if payload.get("is_default"):
+            if existing.get("strategy_type") == "System":
+                strategies.update_many(
+                    {"strategy_type": "System", "is_default": True, "_id": {"$ne": object_id}},
+                    {"$set": {"is_default": False}},
+                )
+            elif user_id:
+                strategies.update_many(
+                    {"user_id": user_id, "is_default": True, "_id": {"$ne": object_id}},
+                    {"$set": {"is_default": False}},
+                )
 
         update = dict(payload)
         update["updated_at"] = datetime.utcnow()
-        query = {"_id": object_id, **V3Service._build_user_scope(user_id)}
+        if user_id:
+            query = {
+                "_id": object_id,
+                "$or": [{"user_id": user_id}, {"strategy_type": "System"}],
+            }
+        else:
+            query = {"_id": object_id}
+
         result = strategies.update_one(query, {"$set": update})
         if result.matched_count == 0:
             return None
