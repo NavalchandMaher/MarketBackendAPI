@@ -76,6 +76,15 @@ class AccountPayload(BaseModel):
     max_open_trades: Optional[int] = None
 
 
+class LearningLogPayload(BaseModel):
+    """A user-authored note shown in the Learning Logs screen."""
+
+    title: str = Field(min_length=1, max_length=200)
+    description: str = Field(min_length=1, max_length=5000)
+    category: str = Field(default="lesson", min_length=1, max_length=100)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
 @router.get("/dashboard")
 def dashboard(user=Depends(AuthService.get_current_user)):
     return V3Service.dashboard_summary(user_id=str(user["_id"]))
@@ -324,8 +333,8 @@ def list_backtests(user=Depends(AuthService.get_current_user)):
 
 
 @router.get("/backtest/{backtest_id}")
-def get_backtest(strategy_id: str, user=Depends(AuthService.get_current_user)):
-    backtest = V3Service.get_backtest(strategy_id, user_id=str(user["_id"]))
+def get_backtest(backtest_id: str, user=Depends(AuthService.get_current_user)):
+    backtest = V3Service.get_backtest(backtest_id, user_id=str(user["_id"]))
     if not backtest:
         raise HTTPException(status_code=404, detail="Backtest not found")
     return backtest
@@ -446,13 +455,58 @@ def reports_performance(user=Depends(AuthService.get_current_user)):
 
 
 @router.get("/learning")
-def learning_history(user=Depends(AuthService.get_current_user)):
-    return V3Service.learning_history(user_id=str(user["_id"]))
+def learning_history(
+    category: Optional[str] = Query(None),
+    days: Optional[int] = Query(None, ge=1, le=3650),
+    user=Depends(AuthService.get_current_user),
+):
+    return V3Service.learning_history(
+        user_id=str(user["_id"]), category=category, days=days
+    )
+
+
+@router.post("/learning", status_code=201)
+def create_learning_log(
+    payload: LearningLogPayload, user=Depends(AuthService.get_current_user)
+):
+    return V3Service.create_learning_log(
+        payload.model_dump(), user_id=str(user["_id"])
+    )
 
 
 @router.get("/learning/latest")
 def learning_latest(user=Depends(AuthService.get_current_user)):
     return V3Service.learning_latest(user_id=str(user["_id"]))
+
+
+@router.get("/learning/{log_id}")
+def learning_detail(log_id: str, user=Depends(AuthService.get_current_user)):
+    log = V3Service.get_learning_log(log_id, user_id=str(user["_id"]))
+    if not log:
+        raise HTTPException(status_code=404, detail="Learning log not found")
+    return log
+
+
+@router.put("/learning/{log_id}")
+def update_learning_log(
+    log_id: str,
+    payload: LearningLogPayload,
+    user=Depends(AuthService.get_current_user),
+):
+    log = V3Service.update_learning_log(
+        log_id, payload.model_dump(), user_id=str(user["_id"])
+    )
+    if not log:
+        raise HTTPException(status_code=404, detail="Learning log not found")
+    return log
+
+
+@router.delete("/learning/{log_id}")
+def delete_learning_log(log_id: str, user=Depends(AuthService.get_current_user)):
+    deleted = V3Service.delete_learning_log(log_id, user_id=str(user["_id"]))
+    if not deleted["success"]:
+        raise HTTPException(status_code=404, detail="Learning log not found")
+    return deleted
 
 
 @router.get("/scheduler/jobs")

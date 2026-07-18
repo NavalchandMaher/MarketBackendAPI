@@ -5,3 +5,9 @@ pandas
 ta
 numpy
 requests
+pymongo
+python-dotenv
+python-jose[cryptography]
+passlib[bcrypt]
+email-validator
+apscheduler

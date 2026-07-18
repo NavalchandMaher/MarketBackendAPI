@@ -6,14 +6,11 @@ Market AI V2
 from datetime import datetime
 from pymongo import MongoClient, ASCENDING
 from pymongo.errors import ConnectionFailure
+from config import DATABASE_NAME, MONGO_URI
 
 # ==========================================================
 # CONFIG
 # ==========================================================
-
-MONGO_URI = "mongodb://localhost:27017"
-
-DATABASE_NAME = "MarketAI_V2"
 
 # ==========================================================
 # CONNECT

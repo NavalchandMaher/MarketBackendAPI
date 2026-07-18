@@ -270,7 +270,7 @@ class V3Service:
                 df = BackTester.prepare(df)
 
                 # Construct a strategy payload that preserves the new UI condition structure.
-                ind_params = payload.get("indicator_parameters", {}) or {}
+                ind_params = resolved_payload.get("indicator_parameters", {}) or {}
                 if not isinstance(ind_params, dict):
                     ind_params = {}
 
@@ -473,14 +473,97 @@ class V3Service:
         }
 
     @staticmethod
-    def learning_history(user_id: Optional[str] = None) -> List[Dict[str, Any]]:
-        docs = list(learning_logs.find(V3Service._build_user_scope(user_id)).sort("created_at", -1).limit(50))
+    def learning_history(
+        user_id: Optional[str] = None,
+        category: Optional[str] = None,
+        days: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        query = V3Service._build_user_scope(user_id)
+        if category:
+            query["category"] = category
+        if days:
+            query["created_at"] = {"$gte": datetime.utcnow() - timedelta(days=days)}
+        docs = list(learning_logs.find(query).sort("created_at", -1).limit(50))
         return [V3Service._jsonify_document(doc) for doc in docs]
 
     @staticmethod
     def learning_latest(user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         doc = learning_logs.find_one(V3Service._build_user_scope(user_id), sort=[("created_at", -1)])
         return V3Service._jsonify_document(doc)
+
+    @staticmethod
+    def get_learning_log(
+        log_id: str, user_id: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        from bson.objectid import ObjectId
+
+        try:
+            object_id = ObjectId(log_id)
+        except Exception:
+            object_id = log_id
+        doc = learning_logs.find_one(
+            {"_id": object_id, **V3Service._build_user_scope(user_id)}
+        )
+        return V3Service._jsonify_document(doc)
+
+    @staticmethod
+    def create_learning_log(
+        payload: Dict[str, Any], user_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        now = datetime.utcnow()
+        doc = {
+            "user_id": user_id,
+            "title": payload["title"].strip(),
+            "description": payload["description"].strip(),
+            "category": payload.get("category", "lesson").strip(),
+            "metadata": payload.get("metadata", {}),
+            "source": "manual",
+            "created_at": now,
+            "updated_at": now,
+        }
+        result = learning_logs.insert_one(doc)
+        doc["_id"] = result.inserted_id
+        return V3Service._jsonify_document(doc)
+
+    @staticmethod
+    def update_learning_log(
+        log_id: str, payload: Dict[str, Any], user_id: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        from bson.objectid import ObjectId
+
+        try:
+            object_id = ObjectId(log_id)
+        except Exception:
+            object_id = log_id
+        update = {
+            "title": payload["title"].strip(),
+            "description": payload["description"].strip(),
+            "category": payload.get("category", "lesson").strip(),
+            "metadata": payload.get("metadata", {}),
+            "updated_at": datetime.utcnow(),
+        }
+        result = learning_logs.update_one(
+            {"_id": object_id, **V3Service._build_user_scope(user_id)},
+            {"$set": update},
+        )
+        if result.matched_count == 0:
+            return None
+        return V3Service.get_learning_log(log_id, user_id=user_id)
+
+    @staticmethod
+    def delete_learning_log(
+        log_id: str, user_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        from bson.objectid import ObjectId
+
+        try:
+            object_id = ObjectId(log_id)
+        except Exception:
+            object_id = log_id
+        result = learning_logs.delete_one(
+            {"_id": object_id, **V3Service._build_user_scope(user_id)}
+        )
+        return {"success": result.deleted_count > 0, "deleted": result.deleted_count > 0}
 
     @staticmethod
     def scheduler_jobs(user_id: Optional[str] = None) -> Dict[str, Any]:
