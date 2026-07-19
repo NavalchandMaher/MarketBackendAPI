@@ -281,7 +281,7 @@ def calculate_indicators(df):
 # ============================================================
 
 
-def analyze_market(symbol="BTCUSDT", timeframe="5m", user_id=None):
+def analyze_market(symbol="BTCUSDT", timeframe="5m", user_id=None, open_paper_trade=False):
 
     # ---------------------------------------
     # VALIDATE TIMEFRAME
@@ -596,14 +596,17 @@ def analyze_market(symbol="BTCUSDT", timeframe="5m", user_id=None):
     # PAPER TRADING
     # ============================================================
 
-    open_trade = paper_trades.find_one(
-        {"symbol": symbol, "timeframe": timeframe, "status": "OPEN"}
-    )
+    open_trade_query = {"symbol": symbol, "timeframe": timeframe, "status": "OPEN"}
+    if user_id:
+        open_trade_query["user_id"] = user_id
 
-    if signal != "WAIT" and open_trade is None:
+    open_trade = paper_trades.find_one(open_trade_query)
+
+    if open_paper_trade and signal != "WAIT" and open_trade is None:
 
         PaperTrading.open_trade(
             {
+                "user_id": user_id,
                 "symbol": symbol,
                 "timeframe": timeframe,
                 "strategy_name": strategy_name,
@@ -622,9 +625,7 @@ def analyze_market(symbol="BTCUSDT", timeframe="5m", user_id=None):
     # CURRENT PAPER TRADE
     # ============================================================
 
-    open_trade = paper_trades.find_one(
-        {"symbol": symbol, "timeframe": timeframe, "status": "OPEN"}
-    )
+    open_trade = paper_trades.find_one(open_trade_query)
 
     trade_info = None
 

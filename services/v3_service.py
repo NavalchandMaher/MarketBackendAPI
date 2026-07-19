@@ -411,20 +411,36 @@ class V3Service:
         return {"success": result.deleted_count > 0, "deleted": result.deleted_count > 0}
 
     @staticmethod
-    def paper_start(user_id: Optional[str] = None) -> Dict[str, Any]:
+    def paper_start(
+        user_id: Optional[str] = None,
+        symbol: str = "BTCUSDT",
+        timeframe: str = "5m",
+    ) -> Dict[str, Any]:
+        """Open a paper trade using a fresh signal from the user's default strategy."""
+        analysis = analyze_market(symbol=symbol, timeframe=timeframe, user_id=user_id)
+        if analysis.get("error"):
+            return {"success": False, "message": analysis["error"]}
+        if analysis.get("signal") == "WAIT":
+            return {
+                "success": False,
+                "message": "WAIT signal. Trade not opened.",
+                "analysis": analysis,
+            }
+
+        strategy = analysis.get("strategy") or {}
         return PaperTrading.open_trade({
             "user_id": user_id,
-            "signal": "BUY",
-            "symbol": "BTCUSDT",
-            "timeframe": "5m",
-            "price": 100000,
-            "strategy_name": "V3_STRATEGY",
-            "strategy_version": 1,
-            "confidence": 0.8,
-            "market_regime": "TREND",
-            "indicators": {},
-            "tp_percent": 2.0,
-            "sl_percent": 1.0,
+            "signal": analysis.get("signal", "WAIT"),
+            "symbol": analysis.get("symbol", symbol),
+            "timeframe": analysis.get("timeframe", timeframe),
+            "price": analysis.get("price", 0),
+            "strategy_name": strategy.get("name", "DEFAULT"),
+            "strategy_version": strategy.get("version", 1),
+            "confidence": analysis.get("confidence", 0),
+            "market_regime": analysis.get("market_regime", "UNKNOWN"),
+            "indicators": analysis.get("indicators", {}),
+            "tp_percent": strategy.get("tp_percent", 2.0),
+            "sl_percent": strategy.get("sl_percent", 1.0),
         })
 
     @staticmethod

@@ -411,8 +411,14 @@ def delete_backtest(backtest_id: str, user=Depends(AuthService.get_current_user)
 
 
 @router.post("/paper/start")
-def paper_start(user=Depends(AuthService.get_current_user)):
-    return V3Service.paper_start(user_id=str(user["_id"]))
+def paper_start(
+    symbol: str = Query("BTCUSDT"),
+    timeframe: str = Query("5m"),
+    user=Depends(AuthService.get_current_user),
+):
+    return V3Service.paper_start(
+        user_id=str(user["_id"]), symbol=symbol, timeframe=timeframe
+    )
 
 
 @router.post("/paper/stop")
