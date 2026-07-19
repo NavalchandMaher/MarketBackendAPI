@@ -341,19 +341,32 @@ def analyze_market(symbol="BTCUSDT", timeframe="5m", user_id=None):
     # LOAD STRATEGY
     # ---------------------------------------
 
-    strategy = LearningEngine.active_strategy()
+    # Strategies are user-scoped.  Resolving without the user ID falls back to
+    # the globally active strategy, which can produce a signal for a different
+    # user's configuration.
+    strategy = LearningEngine.active_strategy(user_id=user_id) or {}
+
+    strategy_parameters = strategy.get("indicator_parameters", {}) or {}
 
     strategy_name = strategy.get("strategy_name", strategy.get("name", "EMA_MACD_V1"))
 
     strategy_version = strategy.get("version", 1)
 
-    BUY_THRESHOLD = strategy.get("buy_threshold", 3)
+    BUY_THRESHOLD = strategy.get(
+        "buy_threshold", strategy_parameters.get("buy_threshold", 3)
+    )
 
-    SELL_THRESHOLD = strategy.get("sell_threshold", -3)
+    SELL_THRESHOLD = strategy.get(
+        "sell_threshold", strategy_parameters.get("sell_threshold", -3)
+    )
 
-    TP_PERCENT = strategy.get("tp_percent", 2)
+    TP_PERCENT = strategy.get(
+        "tp_percent", strategy.get("tp", strategy_parameters.get("tp_percent", 2))
+    )
 
-    SL_PERCENT = strategy.get("sl_percent", 1)
+    SL_PERCENT = strategy.get(
+        "sl_percent", strategy.get("sl", strategy_parameters.get("sl_percent", 1))
+    )
 
     # ---------------------------------------
     # EXTRACT INDICATORS

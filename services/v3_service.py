@@ -41,16 +41,18 @@ class V3Service:
         open_trades = paper_trades.count_documents({"status": "OPEN", **query})
         closed_trades_count = closed_trades.count_documents(query)
         last_trade = closed_trades.find_one(query, sort=[("closed_at", -1)]) or paper_trades.find_one(query, sort=[("created_at", -1)])
-        latest_strategy = strategies.find_one(query, sort=[("created_at", -1)])
         latest_signal = {"signal": "WAIT", "confidence": 0, "price": 0}
         try:
             latest_signal = analyze_market(symbol="BTCUSDT", timeframe="5m", user_id=user_id)
         except Exception as exc:
             logger.exception("dashboard summary signal failed: %s", exc)
+        signal_strategy = latest_signal.get("strategy") or {}
         return {
             "current_signal": latest_signal.get("signal", "WAIT"),
-            "strategy_name": latest_strategy.get("strategy_name") if latest_strategy else "DEFAULT",
-            "strategy_version": latest_strategy.get("version", 1) if latest_strategy else 1,
+            # Keep the dashboard label tied to the strategy that generated its
+            # signal, rather than the most recently created strategy.
+            "strategy_name": signal_strategy.get("name", "DEFAULT"),
+            "strategy_version": signal_strategy.get("version", 1),
             "current_price": latest_signal.get("price", 0),
             "confidence": latest_signal.get("confidence", 0),
             "account_balance": 100000,
