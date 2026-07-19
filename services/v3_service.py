@@ -77,7 +77,18 @@ class V3Service:
             # No user scoping — return all (admins calling without user_id)
             query = {}
         docs = list(strategies.find(query).sort("created_at", -1))
-        return [V3Service._jsonify_document(doc) for doc in docs]
+        result = [V3Service._jsonify_document(doc) for doc in docs]
+
+        # A trader may select a published System strategy as their own default
+        # without mutating the global System strategy for every other user.
+        if user_id and str(role).lower() != "admin":
+            preference = settings.find_one({"user_id": user_id}) or {}
+            default_strategy_id = preference.get("default_strategy_id")
+            if default_strategy_id:
+                for strategy in result:
+                    strategy["is_default"] = strategy.get("id") == default_strategy_id
+
+        return result
 
     @staticmethod
     def list_all_strategies() -> List[Dict[str, Any]]:
@@ -121,6 +132,10 @@ class V3Service:
                 strategies.update_many(
                     {"user_id": user_id, "is_default": True},
                     {"$set": {"is_default": False}},
+                )
+                settings.update_one(
+                    {"user_id": user_id},
+                    {"$unset": {"default_strategy_id": ""}},
                 )
             elif payload.get("strategy_type") == "System":
                 strategies.update_many(
@@ -177,6 +192,10 @@ class V3Service:
                     {"user_id": user_id, "is_default": True, "_id": {"$ne": object_id}},
                     {"$set": {"is_default": False}},
                 )
+                settings.update_one(
+                    {"user_id": user_id},
+                    {"$unset": {"default_strategy_id": ""}},
+                )
 
         update = dict(payload)
         update["updated_at"] = datetime.utcnow()
@@ -199,6 +218,26 @@ class V3Service:
         if result.matched_count == 0:
             return None
         return V3Service.get_strategy(strategy_id, user_id=user_id, role=role)
+
+    @staticmethod
+    def set_user_default_system_strategy(
+        strategy_id: str, user_id: str, strategy: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Persist a trader's System-strategy preference without editing it."""
+        settings.update_one(
+            {"user_id": user_id},
+            {
+                "$set": {
+                    "user_id": user_id,
+                    "default_strategy_id": strategy_id,
+                    "updated_at": datetime.utcnow(),
+                }
+            },
+            upsert=True,
+        )
+        result = V3Service._jsonify_document(strategy) or {}
+        result["is_default"] = True
+        return result
 
     @staticmethod
     def delete_strategy(strategy_id: str, user_id: Optional[str] = None) -> Dict[str, Any]:

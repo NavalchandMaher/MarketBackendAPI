@@ -9,7 +9,7 @@ and continuously improves the trading strategy.
 
 from datetime import datetime
 
-from db.mongodb import closed_trades, learning_logs, strategies, market_snapshots
+from db.mongodb import closed_trades, learning_logs, strategies, market_snapshots, settings
 
 
 class LearningEngine:
@@ -34,9 +34,29 @@ class LearningEngine:
         strategy = None
 
         if user_id:
+            preference = settings.find_one({"user_id": user_id}) or {}
+            default_strategy_id = preference.get("default_strategy_id")
+            if default_strategy_id:
+                from bson.objectid import ObjectId
+
+                try:
+                    object_id = ObjectId(default_strategy_id)
+                except Exception:
+                    object_id = default_strategy_id
+                strategy = strategies.find_one(
+                    {
+                        "_id": object_id,
+                        "enabled": True,
+                        "$or": [
+                            {"user_id": user_id},
+                            {"strategy_type": "System", "published": True},
+                        ],
+                    }
+                )
+
             strategy = strategies.find_one(
                 {"enabled": True, "user_id": user_id, "is_default": True}
-            )
+            ) if strategy is None else strategy
             if not strategy:
                 strategy = strategies.find_one(
                     {"enabled": True, "user_id": user_id}

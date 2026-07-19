@@ -141,6 +141,33 @@ def publish_strategy(
     return updated
 
 
+@router.put("/strategies/{strategy_id}/default")
+def set_default_strategy(strategy_id: str, user=Depends(AuthService.get_current_user)):
+    """Set a default strategy while preserving System-strategy ownership."""
+    user_id = str(user["_id"])
+    role = user.get("role")
+    existing_strategy = V3Service.get_strategy(strategy_id, user_id=user_id, role=role)
+    if not existing_strategy:
+        raise HTTPException(status_code=404, detail="Strategy not found")
+
+    if existing_strategy.get("strategy_type") == "System" and str(role).lower() != "admin":
+        # The trader may choose an eligible published System strategy, but may
+        # not edit its global document.
+        return V3Service.set_user_default_system_strategy(
+            strategy_id, user_id, existing_strategy
+        )
+
+    updated = V3Service.update_strategy(
+        strategy_id,
+        {"is_default": True},
+        user_id=user_id,
+        role=role,
+    )
+    if not updated:
+        raise HTTPException(status_code=403, detail="You cannot set this strategy as default")
+    return updated
+
+
 @router.post("/strategies", status_code=201)
 def create_strategy(payload: StrategyPayload, user=Depends(AuthService.get_current_user)):
     data = payload.model_dump(exclude_none=True)
