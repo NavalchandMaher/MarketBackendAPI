@@ -76,6 +76,10 @@ notifications = db["notifications"]
 
 scheduler_logs = db["scheduler_logs"]
 
+# Records one-time bootstrap actions.  This prevents a deleted template from
+# being silently recreated during a later application restart.
+bootstrap_state = db["bootstrap_state"]
+
 # ==========================================================
 # INDEXES
 # ==========================================================
@@ -129,11 +133,17 @@ if connected:
     scheduler_logs.create_index([("job_name", ASCENDING), ("run_time", ASCENDING)])
 
 # ==========================================================
-# DEFAULT STRATEGY
+# DEFAULT SYSTEM STRATEGY
 # ==========================================================
 
+# This is a bootstrap template, not a hardcoded runtime strategy.  Once it is
+# in MongoDB it is managed like every other System strategy: Admins can edit,
+# publish/unpublish, or delete it through the API.
+DEFAULT_SYSTEM_STRATEGY_NAME = "EMA_MACD_V1"
+DEFAULT_SYSTEM_STRATEGY_SEED_MARKER = "default_system_strategy_seeded"
+
 default_strategy = {
-    "strategy_name": "EMA_MACD_V1",
+    "strategy_name": DEFAULT_SYSTEM_STRATEGY_NAME,
     "version": 1,
     "enabled": True,
     "is_default": True,
@@ -142,7 +152,7 @@ default_strategy = {
     "priority": 1,
     "symbol": "BTCUSDT",
     "timeframe": "5m",
-    "strategy_type": "Scalping",
+    "strategy_type": "System",
     "exchange": "BINANCE",
     "description": "Default EMA_MACD_V1 strategy",
     "risk_percent": 1.0,
@@ -319,15 +329,47 @@ default_strategy = {
     "risk_reward": 2,
     "max_open_trades": 3,
     "created_by": "SYSTEM",
+    # Published System strategies are visible to traders, but server-side
+    # ownership checks keep them read-only for those users.
+    "published": True,
     "created_at": datetime.utcnow(),
     "updated_at": datetime.utcnow(),
 }
 
-if connected and strategies.count_documents({"enabled": True}) == 0:
+if connected:
+    # Migrate the old bootstrap record in place so its existing settings and
+    # history are preserved.  Only unowned system records are targeted; no
+    # user strategy is converted.
+    strategies.update_many(
+        {
+            "strategy_name": DEFAULT_SYSTEM_STRATEGY_NAME,
+            "created_by": "SYSTEM",
+            "$or": [
+                {"user_id": {"$exists": False}},
+                {"user_id": None},
+            ],
+        },
+        {
+            "$set": {
+                "strategy_type": "System",
+                "published": True,
+                "updated_at": datetime.utcnow(),
+            },
+            "$unset": {"user_id": ""},
+        },
+    )
 
-    strategies.insert_one(default_strategy)
-
-    print("Default Strategy Created")
+    # Bootstrap a new database once.  The marker ensures an Admin can delete
+    # the template permanently without it being recreated on a later restart.
+    if not bootstrap_state.find_one({"key": DEFAULT_SYSTEM_STRATEGY_SEED_MARKER}):
+        if strategies.count_documents({}) == 0:
+            strategies.insert_one(default_strategy)
+            print("Default System Strategy Created")
+        bootstrap_state.update_one(
+            {"key": DEFAULT_SYSTEM_STRATEGY_SEED_MARKER},
+            {"$setOnInsert": {"key": DEFAULT_SYSTEM_STRATEGY_SEED_MARKER, "created_at": datetime.utcnow()}},
+            upsert=True,
+        )
 
 # ==========================================================
 # DEFAULT SETTINGS
