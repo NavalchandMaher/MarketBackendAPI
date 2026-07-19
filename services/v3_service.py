@@ -185,13 +185,15 @@ class V3Service:
         if existing.get("strategy_type") == "System" and "created_by" not in update:
             update["created_by"] = existing.get("created_by", "SYSTEM")
 
-        if user_id:
-            query = {
-                "_id": object_id,
-                "$or": [{"user_id": user_id}, {"strategy_type": "System"}],
-            }
+        is_system = str(existing.get("strategy_type", "")).lower() == "system"
+        if is_system:
+            if str(role).lower() != "admin":
+                return None
+            query = {"_id": object_id, "strategy_type": "System"}
         else:
-            query = {"_id": object_id}
+            if not user_id or existing.get("user_id") != user_id:
+                return None
+            query = {"_id": object_id, "user_id": user_id}
 
         result = strategies.update_one(query, {"$set": update})
         if result.matched_count == 0:

@@ -90,7 +90,13 @@ if connected:
 
     closed_trades.create_index([("closed_at", ASCENDING)])
 
-    strategies.create_index([("strategy_name", ASCENDING)], unique=True)
+    # Strategy names are private to a user. System strategies use user_id=None,
+    # so this compound unique index permits a user strategy to share a name with
+    # a global system strategy while still preventing duplicate names per owner.
+    legacy_strategy_name_index = strategies.index_information().get("strategy_name_1")
+    if legacy_strategy_name_index and legacy_strategy_name_index.get("unique"):
+        strategies.drop_index("strategy_name_1")
+    strategies.create_index([("user_id", ASCENDING), ("strategy_name", ASCENDING)], unique=True)
 
     strategies.create_index([("enabled", ASCENDING)])
 
