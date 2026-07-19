@@ -17,7 +17,9 @@ router = APIRouter(prefix="/v3", tags=["v3"])
 
 
 class StrategyPayload(BaseModel):
-    strategy_name: str = Field(min_length=1, max_length=200)
+    # Updates are partial (for example, setting a strategy as default only
+    # sends `is_default`), so the route validates the name only on creation.
+    strategy_name: Optional[str] = Field(default=None, min_length=1, max_length=200)
     description: Optional[str] = None
     version: Optional[int] = 1
     enabled: Optional[bool] = True
@@ -142,6 +144,10 @@ def publish_strategy(
 @router.post("/strategies", status_code=201)
 def create_strategy(payload: StrategyPayload, user=Depends(AuthService.get_current_user)):
     data = payload.model_dump(exclude_none=True)
+    strategy_name = data.get("strategy_name", "").strip()
+    if not strategy_name:
+        raise HTTPException(status_code=422, detail="Strategy name is required")
+    data["strategy_name"] = strategy_name
     # Determine creator type from user role
     role = user.get("role", "Trader")
     created_by = "SYSTEM" if str(role).lower() == "admin" else "TRADER"
@@ -183,24 +189,29 @@ def update_strategy(strategy_id: str, payload: StrategyPayload, user=Depends(Aut
     if existing_strategy.get("strategy_type") == "System" and user.get("role") != "Admin":
         raise HTTPException(status_code=403, detail="Only admins can update system strategies")
 
-    if payload.strategy_type == "System" and user.get("role") != "Admin":
+    # Only apply fields sent by the client.  In particular, controls such as
+    # "Set as default" submit only `is_default` and must not reset the other
+    # strategy fields to their model defaults.
+    data = payload.model_dump(exclude_unset=True)
+    if data.get("strategy_type") == "System" and user.get("role") != "Admin":
         raise HTTPException(status_code=403, detail="Only admins can change strategy type to System")
-
-    data = payload.model_dump(exclude_none=True)
 
     # Ensure created_by reflects the updater's role when creating/changing ownership
     role = user.get("role", "Trader")
-    if data.get("strategy_type") == "System":
-        data["created_by"] = "SYSTEM"
+    existing_is_system = existing_strategy.get("strategy_type") == "System"
+    requested_is_system = data.get("strategy_type", existing_strategy.get("strategy_type")) == "System"
+    if requested_is_system:
+        data.setdefault("created_by", "SYSTEM")
         # Only Admins may change the published flag
         if "published" in data and str(role).lower() != "admin":
             raise HTTPException(status_code=403, detail="Only admins can change published state for System strategies")
-        # If published not provided, preserve existing published flag (default False)
-        data["published"] = bool(data.get("published", True if existing_strategy.get("published") else False))
-    else:
-        # For non-system strategies, mark created_by according to the actor (Admin actions are still SYSTEM)
+        # A newly converted System strategy is private until an Admin publishes it.
+        if not existing_is_system:
+            data.setdefault("published", False)
+    elif "strategy_type" in data:
+        # Explicitly converting a System strategy to a user strategy removes its
+        # global publication state.  Partial updates leave it untouched.
         data.setdefault("created_by", "SYSTEM" if str(role).lower() == "admin" else "TRADER")
-        # Ensure non-system strategies are not published globally
         data["published"] = False
 
     updated = V3Service.update_strategy(strategy_id, data, user_id=str(user["_id"]), role=user.get("role"))
