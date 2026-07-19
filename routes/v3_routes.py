@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from pydantic import BaseModel, Field
+from pymongo.errors import DuplicateKeyError
 from typing import Any, Dict, Optional
 import uuid
 from datetime import datetime
@@ -16,7 +17,7 @@ router = APIRouter(prefix="/v3", tags=["v3"])
 
 
 class StrategyPayload(BaseModel):
-    strategy_name: Optional[str] = None
+    strategy_name: str = Field(min_length=1, max_length=200)
     description: Optional[str] = None
     version: Optional[int] = 1
     enabled: Optional[bool] = True
@@ -163,7 +164,13 @@ def create_strategy(payload: StrategyPayload, user=Depends(AuthService.get_curre
     # Always record who created the strategy based on the actor's role
     data["created_by"] = created_by
 
-    return V3Service.create_strategy(data)
+    try:
+        return V3Service.create_strategy(data)
+    except DuplicateKeyError:
+        raise HTTPException(
+            status_code=409,
+            detail="A strategy with this name already exists for this owner",
+        )
 
 
 @router.put("/strategies/{strategy_id}")

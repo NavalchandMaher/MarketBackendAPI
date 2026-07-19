@@ -93,9 +93,17 @@ if connected:
     # Strategy names are private to a user. System strategies use user_id=None,
     # so this compound unique index permits a user strategy to share a name with
     # a global system strategy while still preventing duplicate names per owner.
-    legacy_strategy_name_index = strategies.index_information().get("strategy_name_1")
-    if legacy_strategy_name_index and legacy_strategy_name_index.get("unique"):
-        strategies.drop_index("strategy_name_1")
+    #
+    # Older deployments used either `name` or `strategy_name` as a globally
+    # unique field.  New documents only have `strategy_name`; leaving the old
+    # `name` index in place makes every insert after the first fail with
+    # DuplicateKeyError for `name: null`.
+    strategy_indexes = strategies.index_information()
+    for index_name, index in strategy_indexes.items():
+        index_key = index.get("key", {})
+        key = list(index_key.items()) if hasattr(index_key, "items") else list(index_key)
+        if index.get("unique") and key in ([('name', 1)], [('strategy_name', 1)]):
+            strategies.drop_index(index_name)
     strategies.create_index([("user_id", ASCENDING), ("strategy_name", ASCENDING)], unique=True)
 
     strategies.create_index([("enabled", ASCENDING)])
