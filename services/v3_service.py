@@ -154,6 +154,7 @@ class V3Service:
             "live_mode": payload.get("live_mode", False),
             "priority": payload.get("priority", 1),
             "symbol": payload.get("symbol", "BTCUSDT"),
+            "symbols": payload.get("symbols") or [payload.get("symbol", "BTCUSDT")],
             "timeframe": payload.get("timeframe", "5m"),
             "strategy_type": payload.get("strategy_type", "Scalping"),
             "risk_percent": payload.get("risk_percent", 1.0),

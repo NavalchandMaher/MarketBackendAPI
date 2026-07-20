@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from pydantic import BaseModel, Field
 from pymongo.errors import DuplicateKeyError
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 import uuid
 from datetime import datetime
 import traceback
@@ -28,6 +28,7 @@ class StrategyPayload(BaseModel):
     priority: Optional[int] = 1
     exchange: Optional[str] = "BINANCE"
     symbol: Optional[str] = "BTCUSDT"
+    symbols: Optional[List[str]] = None
     timeframe: Optional[str] = "5m"
     strategy_type: Optional[str] = "Scalping"
     risk_percent: Optional[float] = 1.0
@@ -37,6 +38,21 @@ class StrategyPayload(BaseModel):
     published: Optional[bool] = False
 
     indicator_parameters: Dict[str, Any] = Field(default_factory=dict)
+
+
+def _normalize_strategy_symbols(symbols: Optional[List[str]], fallback: Optional[str]) -> List[str]:
+    """Validate saved strategy symbols and retain their user-selected order."""
+    raw_symbols = symbols if symbols is not None else [fallback or "BTCUSDT"]
+    normalized = list(
+        dict.fromkeys(
+            symbol.strip().upper()
+            for symbol in raw_symbols
+            if isinstance(symbol, str) and symbol.strip()
+        )
+    )
+    if not normalized:
+        raise HTTPException(status_code=422, detail="Select at least one trading symbol")
+    return normalized
 
 
 class BacktestPayload(BaseModel):
@@ -119,16 +135,33 @@ def strategy_signals(
     if not visible_strategies:
         return []
 
-    # Fetch and calculate the market snapshot once; only a strategy's
-    # thresholds and risk parameters differ between the returned signals.
-    base_analysis = analyze_market(symbol, timeframe, user_id=user_id)
-    if base_analysis.get("error"):
-        raise HTTPException(status_code=502, detail=base_analysis["error"])
+    analyses = {}
+    signals = []
+    for strategy in visible_strategies:
+        # Older strategies have one `symbol`; new strategies can target many.
+        symbols = strategy.get("symbols") or [strategy.get("symbol", symbol)]
+        strategy_timeframe = strategy.get("timeframe") or timeframe
+        for strategy_symbol in dict.fromkeys(symbol for symbol in symbols if symbol):
+            key = (strategy_symbol, strategy_timeframe)
+            if key not in analyses:
+                try:
+                    analyses[key] = analyze_market(
+                        strategy_symbol, strategy_timeframe, user_id=user_id
+                    )
+                except Exception:
+                    # One unavailable market must not hide signals for the
+                    # other symbols selected by the user.
+                    analyses[key] = {"error": "Market analysis unavailable"}
+            base_analysis = analyses[key]
+            if base_analysis.get("error"):
+                continue
 
-    return [
-        apply_strategy_to_analysis(base_analysis, strategy)
-        for strategy in visible_strategies
-    ]
+            strategy_signal = apply_strategy_to_analysis(base_analysis, strategy)
+            # The signals page is intentionally actionable-only.
+            if strategy_signal["signal"] != "WAIT":
+                signals.append(strategy_signal)
+
+    return signals
 
 
 @router.get("/strategies/{strategy_id}")
@@ -201,6 +234,10 @@ def create_strategy(payload: StrategyPayload, user=Depends(AuthService.get_curre
     if not strategy_name:
         raise HTTPException(status_code=422, detail="Strategy name is required")
     data["strategy_name"] = strategy_name
+    data["symbols"] = _normalize_strategy_symbols(
+        data.get("symbols"), data.get("symbol")
+    )
+    data["symbol"] = data["symbols"][0]
     # Determine creator type from user role
     role = user.get("role", "Trader")
     created_by = "SYSTEM" if str(role).lower() == "admin" else "TRADER"
@@ -246,6 +283,11 @@ def update_strategy(strategy_id: str, payload: StrategyPayload, user=Depends(Aut
     # "Set as default" submit only `is_default` and must not reset the other
     # strategy fields to their model defaults.
     data = payload.model_dump(exclude_unset=True)
+    if "symbols" in data:
+        data["symbols"] = _normalize_strategy_symbols(
+            data["symbols"], data.get("symbol", existing_strategy.get("symbol"))
+        )
+        data["symbol"] = data["symbols"][0]
     if data.get("strategy_type") == "System" and user.get("role") != "Admin":
         raise HTTPException(status_code=403, detail="Only admins can change strategy type to System")
 
