@@ -10,7 +10,7 @@ from db.mongodb import backtest_results, notifications
 
 from services.v3_service import V3Service
 from services.auth_service import AuthService
-from services.signal_engine import analyze_market
+from services.signal_engine import analyze_market, apply_strategy_to_analysis
 from services.scheduler_service import SchedulerService
 
 router = APIRouter(prefix="/v3", tags=["v3"])
@@ -103,6 +103,32 @@ def analysis(symbol: str = Query("BTCUSDT"), timeframe: str = Query("5m"), user=
 def strategies_list(user=Depends(AuthService.get_current_user)):
     # Only return published System strategies to non-admin users
     return V3Service.list_strategies(user_id=str(user["_id"]), role=user.get("role"))
+
+
+@router.get("/strategies/signals")
+def strategy_signals(
+    symbol: str = Query("BTCUSDT"),
+    timeframe: str = Query("5m"),
+    user=Depends(AuthService.get_current_user),
+):
+    """Return a current market signal for every strategy visible to the user."""
+    user_id = str(user["_id"])
+    visible_strategies = V3Service.list_strategies(
+        user_id=user_id, role=user.get("role")
+    )
+    if not visible_strategies:
+        return []
+
+    # Fetch and calculate the market snapshot once; only a strategy's
+    # thresholds and risk parameters differ between the returned signals.
+    base_analysis = analyze_market(symbol, timeframe, user_id=user_id)
+    if base_analysis.get("error"):
+        raise HTTPException(status_code=502, detail=base_analysis["error"])
+
+    return [
+        apply_strategy_to_analysis(base_analysis, strategy)
+        for strategy in visible_strategies
+    ]
 
 
 @router.get("/strategies/{strategy_id}")
@@ -414,10 +440,23 @@ def delete_backtest(backtest_id: str, user=Depends(AuthService.get_current_user)
 def paper_start(
     symbol: str = Query("BTCUSDT"),
     timeframe: str = Query("5m"),
+    strategy_id: Optional[str] = Query(None),
     user=Depends(AuthService.get_current_user),
 ):
+    strategy = None
+    if strategy_id:
+        strategy = V3Service.get_strategy(
+            strategy_id,
+            user_id=str(user["_id"]),
+            role=user.get("role"),
+        )
+        if not strategy:
+            raise HTTPException(status_code=404, detail="Strategy not found")
     return V3Service.paper_start(
-        user_id=str(user["_id"]), symbol=symbol, timeframe=timeframe
+        user_id=str(user["_id"]),
+        symbol=symbol,
+        timeframe=timeframe,
+        strategy=strategy,
     )
 
 

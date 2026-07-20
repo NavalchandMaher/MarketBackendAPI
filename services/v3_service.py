@@ -15,7 +15,7 @@ from db.mongodb import (
 )
 from services.paper_trading import PaperTrading
 from services.backtester import BackTester
-from services.signal_engine import analyze_market
+from services.signal_engine import analyze_market, apply_strategy_to_analysis
 from services.auth_service import AuthService
 
 logger = logging.getLogger(__name__)
@@ -415,11 +415,14 @@ class V3Service:
         user_id: Optional[str] = None,
         symbol: str = "BTCUSDT",
         timeframe: str = "5m",
+        strategy: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        """Open a paper trade using a fresh signal from the user's default strategy."""
+        """Open a paper trade using a fresh signal from the selected strategy."""
         analysis = analyze_market(symbol=symbol, timeframe=timeframe, user_id=user_id)
         if analysis.get("error"):
             return {"success": False, "message": analysis["error"]}
+        if strategy is not None:
+            analysis = apply_strategy_to_analysis(analysis, strategy)
         if analysis.get("signal") == "WAIT":
             return {
                 "success": False,

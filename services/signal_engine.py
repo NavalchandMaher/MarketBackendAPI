@@ -1,4 +1,5 @@
 import ccxt
+import copy
 import pandas as pd
 import ta
 import requests
@@ -48,6 +49,50 @@ def validate_timeframe(timeframe):
         return "5m"
 
     return timeframe
+
+
+def apply_strategy_to_analysis(analysis, strategy):
+    """Return a market analysis labelled and scored for one saved strategy.
+
+    Market indicators are common to every strategy for the same symbol and
+    timeframe.  A strategy changes the decision thresholds and trade-risk
+    values, so this helper lets the API calculate those shared indicators once
+    and safely produce a live signal for every visible strategy.
+    """
+    result = copy.deepcopy(analysis)
+    parameters = strategy.get("indicator_parameters", {}) or {}
+    buy_threshold = strategy.get(
+        "buy_threshold", parameters.get("buy_threshold", 3)
+    )
+    sell_threshold = strategy.get(
+        "sell_threshold", parameters.get("sell_threshold", -3)
+    )
+    tp_percent = strategy.get(
+        "tp_percent", strategy.get("tp", parameters.get("tp_percent", 2))
+    )
+    sl_percent = strategy.get(
+        "sl_percent", strategy.get("sl", parameters.get("sl_percent", 1))
+    )
+
+    score = result.get("score", 0)
+    if score >= buy_threshold:
+        signal = "BUY"
+    elif score <= sell_threshold:
+        signal = "SELL"
+    else:
+        signal = "WAIT"
+
+    result["signal"] = signal
+    result["strategy"] = {
+        "id": str(strategy.get("id", strategy.get("_id", ""))),
+        "name": strategy.get("strategy_name", strategy.get("name", "EMA_MACD_V1")),
+        "version": strategy.get("version", 1),
+        "buy_threshold": buy_threshold,
+        "sell_threshold": sell_threshold,
+        "tp_percent": tp_percent,
+        "sl_percent": sl_percent,
+    }
+    return result
 
 
 # ============================================================
