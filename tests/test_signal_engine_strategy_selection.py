@@ -76,6 +76,45 @@ def test_analysis_uses_the_users_default_strategy_and_its_parameters(monkeypatch
         "tp_percent": 4.0,
         "sl_percent": 2.0,
     }
+    assert result["trade_justification"][0].startswith(
+        "My default strategy produced a WAIT"
+    )
+
+
+def test_strategy_signal_explanation_uses_its_own_rules_and_market_sentiment():
+    analysis = {
+        "score": -5,
+        "higher_timeframe": "BEARISH",
+        "market_regime": "TRENDING",
+        "indicators": {
+            "ema20": 98.0,
+            "ema50": 100.0,
+            "rsi": 64.0,
+            "macd": -0.6,
+            "macd_signal": -0.2,
+            "adx": 31.0,
+            "pcr": 0.72,
+            "oi_change_pct": -2.5,
+        },
+    }
+    strategy = {
+        "strategy_name": "Short Momentum",
+        "sell_threshold": -4,
+        "indicator_parameters": {
+            "sell_conditions": [
+                {"enabled": True, "indicator": {"name": "RSI"}},
+                {"enabled": True, "indicator": {"name": "MACD"}},
+            ]
+        },
+    }
+
+    bullets = signal_engine.build_trade_justification(analysis, strategy, "SELL")
+
+    assert "Short Momentum" in bullets[0]
+    assert "-4 threshold" in bullets[0]
+    assert "RSI, MACD" in bullets[1]
+    assert "higher timeframe is bearish" in bullets[-1]
+    assert "open interest is falling 2.5%" in bullets[-1]
 
 
 def test_dashboard_displays_the_strategy_that_generated_its_signal(monkeypatch):

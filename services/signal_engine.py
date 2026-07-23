@@ -51,6 +51,85 @@ def validate_timeframe(timeframe):
     return timeframe
 
 
+def _configured_indicator_names(strategy, signal):
+    """Return the enabled indicator names configured for this trade side."""
+    parameters = strategy.get("indicator_parameters", {}) or {}
+    conditions = parameters.get(
+        "buy_conditions" if signal == "BUY" else "sell_conditions", []
+    )
+    names = []
+    for condition in conditions:
+        if not isinstance(condition, dict) or condition.get("enabled", True) is False:
+            continue
+        indicator = condition.get("indicator", {}) or {}
+        name = indicator.get("name") or indicator.get("id")
+        if name and name not in names:
+            names.append(str(name))
+    return names
+
+
+def build_trade_justification(analysis, strategy, signal):
+    """Create an evidence-based explanation for one strategy's live signal.
+
+    The market snapshot is shared by strategies, but the threshold, selected
+    direction, and enabled indicator set are not.  Generating the explanation
+    here prevents the signals page from showing the same generic copy for
+    every strategy.
+    """
+    indicators = analysis.get("indicators", {}) or {}
+    score = analysis.get("score", 0)
+    name = strategy.get("strategy_name", strategy.get("name", "This strategy"))
+    threshold_key = "buy_threshold" if signal == "BUY" else "sell_threshold"
+    default_threshold = 3 if signal == "BUY" else -3
+    threshold = strategy.get(
+        threshold_key,
+        (strategy.get("indicator_parameters", {}) or {}).get(
+            threshold_key, default_threshold
+        ),
+    )
+    direction = "bullish" if signal == "BUY" else "bearish"
+    ema20 = safe(indicators.get("ema20"))
+    ema50 = safe(indicators.get("ema50"))
+    rsi = safe(indicators.get("rsi"))
+    macd = safe(indicators.get("macd"))
+    macd_signal = safe(indicators.get("macd_signal"))
+    adx = safe(indicators.get("adx"))
+    pcr = safe(indicators.get("pcr"))
+    oi_change = safe(indicators.get("oi_change_pct"))
+    htf = str(analysis.get("higher_timeframe", "NEUTRAL")).lower()
+    regime = str(analysis.get("market_regime", "UNKNOWN")).lower()
+    configured = _configured_indicator_names(strategy, signal)
+
+    threshold_relation = "met or exceeded" if signal == "BUY" else "met or fell below"
+    bullets = [
+        f"{name} produced a {signal} after its score of {score} {threshold_relation} the {threshold} threshold.",
+    ]
+    if configured:
+        shown = ", ".join(configured[:3])
+        suffix = "" if len(configured) <= 3 else " and other enabled rules"
+        bullets.append(
+            f"This {signal.lower()} setup uses the strategy's configured {shown}{suffix}."
+        )
+
+    ema_direction = "above" if ema20 > ema50 else "below"
+    macd_direction = "above" if macd > macd_signal else "below"
+    bullets.append(
+        f"Technical state is {direction}: EMA20 is {ema_direction} EMA50, "
+        f"MACD is {macd_direction} its signal line, and RSI is {rsi:.1f}."
+    )
+
+    sentiment_parts = [f"higher timeframe is {htf}"]
+    if pcr > 0:
+        sentiment_parts.append(f"PCR is {pcr:.2f}")
+    if oi_change != 0:
+        sentiment_parts.append(f"open interest is {'rising' if oi_change > 0 else 'falling'} {abs(oi_change):.1f}%")
+    bullets.append(
+        f"Market sentiment is assessed from {', '.join(sentiment_parts)}; "
+        f"the market regime is {regime} with ADX at {adx:.1f}."
+    )
+    return bullets
+
+
 def apply_strategy_to_analysis(analysis, strategy):
     """Return a market analysis labelled and scored for one saved strategy.
 
@@ -92,6 +171,9 @@ def apply_strategy_to_analysis(analysis, strategy):
         "tp_percent": tp_percent,
         "sl_percent": sl_percent,
     }
+    result["trade_justification"] = build_trade_justification(
+        result, strategy, signal
+    )
     return result
 
 
@@ -696,7 +778,7 @@ def analyze_market(symbol="BTCUSDT", timeframe="5m", user_id=None, open_paper_tr
     # FINAL RESPONSE
     # ============================================================
 
-    return {
+    result = {
         "symbol": symbol,
         "timeframe": timeframe,
         "signal": signal,
@@ -731,3 +813,7 @@ def analyze_market(symbol="BTCUSDT", timeframe="5m", user_id=None, open_paper_tr
         "paper_trade": trade_info,
         "chart": chart,
     }
+    result["trade_justification"] = build_trade_justification(
+        result, strategy, signal
+    )
+    return result
