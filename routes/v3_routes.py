@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from pydantic import BaseModel, Field
 from pymongo.errors import DuplicateKeyError
 from typing import Any, Dict, List, Optional
+from concurrent.futures import ThreadPoolExecutor
 import uuid
 from datetime import datetime
 import traceback
@@ -14,6 +15,11 @@ from services.signal_engine import analyze_market, apply_strategy_to_analysis
 from services.scheduler_service import SchedulerService
 
 router = APIRouter(prefix="/v3", tags=["v3"])
+
+# Market-data retrieval and backtesting are blocking operations. Keep a small,
+# shared pool so multi-select runs execute concurrently without overwhelming
+# the exchange/API rate limits or spawning an unbounded number of threads.
+BACKTEST_EXECUTOR = ThreadPoolExecutor(max_workers=4, thread_name_prefix="backtest")
 
 
 class StrategyPayload(BaseModel):
@@ -352,7 +358,14 @@ async def _run_backtest_background(data: Dict[str, Any], backtest_id: str, user_
         # Delegate to the existing service (blocking) inside threadpool
         import asyncio
         loop = asyncio.get_running_loop()
-        result = await loop.run_in_executor(None, V3Service.run_backtest, data, user_id, backtest_id, False)
+        result = await loop.run_in_executor(
+            BACKTEST_EXECUTOR,
+            V3Service.run_backtest,
+            data,
+            user_id,
+            backtest_id,
+            False,
+        )
 
         # Update the backtest record with result and completed status
         backtest_results.update_one(
