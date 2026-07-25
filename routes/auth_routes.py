@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr
 from typing import Optional, Dict, Any
 
-from services.auth_service import AuthService, oauth2_scheme
+from services.common.auth_service import AuthService, oauth2_scheme
 
 logger = logging.getLogger(__name__)
 

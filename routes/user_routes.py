@@ -5,7 +5,7 @@ from typing import Optional, Dict, Any
 from bson import ObjectId
 from bson.errors import InvalidId
 
-from services.auth_service import AuthService
+from services.common.auth_service import AuthService
 
 logger = logging.getLogger(__name__)
 

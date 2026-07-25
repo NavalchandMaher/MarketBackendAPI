@@ -1,7 +1,7 @@
-from services.paper_trading import PaperTrading
-from services.learning_engine import LearningEngine
-import services.paper_trading as paper_module
-import services.learning_engine as learning_module
+from services.execution.paper_trading import PaperTrading
+from services.ai.learning_engine import LearningEngine
+import services.execution.paper_trading as paper_module
+import services.ai.learning_engine as learning_module
 
 
 class FakeCollection:

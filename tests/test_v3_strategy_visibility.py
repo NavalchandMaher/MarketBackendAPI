@@ -3,8 +3,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from services.v3_service import V3Service
-import services.v3_service as v3_module
+from services.common.v3_service import V3Service
+import services.common.v3_service as v3_module
 
 
 class FakeCursor:

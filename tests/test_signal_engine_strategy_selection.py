@@ -5,9 +5,9 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from services import signal_engine
-from services.v3_service import V3Service
-import services.v3_service as v3_service
+from services.ai import signal_engine
+from services.common.v3_service import V3Service
+import services.common.v3_service as v3_service
 
 
 class FakePaperTrades:

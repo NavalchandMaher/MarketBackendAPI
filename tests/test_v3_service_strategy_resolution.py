@@ -4,7 +4,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from db.mongodb import strategies
-from services.v3_service import V3Service
+from services.common.v3_service import V3Service
 
 
 def test_resolve_strategy_payload_uses_saved_strategy_settings():

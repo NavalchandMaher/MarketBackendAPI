@@ -1,24 +1,12 @@
-from fastapi import FastAPI, Query, Depends
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from db.mongodb import learning_logs
-from services.signal_engine import analyze_market
 from routes.v3_routes import router as v3_router
 from routes.auth_routes import router as auth_router
 from routes.user_routes import router as user_router
 
-from services.backtester import BackTester
-from db.mongodb import backtest_results
-
 from contextlib import asynccontextmanager
-from services.scheduler_service import SchedulerService
-
-
-from db.mongodb import paper_trades, closed_trades
-from services.performance_service import PerformanceService
-
-from services.learning_engine import LearningEngine
-from services.auth_service import AuthService
+from services.common.scheduler_service import SchedulerService
 
 
 @asynccontextmanager

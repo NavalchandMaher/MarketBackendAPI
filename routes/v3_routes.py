@@ -2,25 +2,21 @@ from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from pydantic import BaseModel, Field
 from pymongo.errors import DuplicateKeyError
 from typing import Any, Dict, List, Optional
-from concurrent.futures import ThreadPoolExecutor
-import uuid
 from datetime import datetime
 import traceback
 
 from db.mongodb import backtest_results, notifications
 
-from services.v3_service import V3Service
-from services.auth_service import AuthService
-from services.signal_engine import analyze_market, apply_strategy_to_analysis
-from services.scheduler_service import SchedulerService
+from services.common.v3_service import V3Service
+from services.common.auth_service import AuthService
+from services.ai.signal_engine import analyze_market, apply_strategy_to_analysis
+from services.common.scheduler_service import SchedulerService
 
 router = APIRouter(prefix="/v3", tags=["v3"])
 
 # Market-data retrieval and backtesting are blocking operations. Keep a small,
 # shared pool so multi-select runs execute concurrently without overwhelming
 # the exchange/API rate limits or spawning an unbounded number of threads.
-BACKTEST_EXECUTOR = ThreadPoolExecutor(max_workers=4, thread_name_prefix="backtest")
-
 
 class StrategyPayload(BaseModel):
     # Updates are partial (for example, setting a strategy as default only
