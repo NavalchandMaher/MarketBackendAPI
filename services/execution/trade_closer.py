@@ -13,9 +13,6 @@ from services.execution.paper_trading import PaperTrading
 from services.market.market_data import get_current_price
 
 # These will be implemented later
-# from services.learning_engine import LearningEngine
-# from services.performance_service import PerformanceService
-
 
 class TradeCloser:
 
